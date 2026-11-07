@@ -421,5 +421,12 @@ I18N.it = {
   "Normal": "Normale",
   "Im Infobereich": "Nell’area di notifica",
   "Beim Schließen im Infobereich weiterlaufen": "Resta nell’area di notifica alla chiusura",
-  "Das X schließt nur das Fenster, der Launcher läuft neben der Uhr weiter – z. B. für Downloads. Ganz beenden über das Symbol dort.": "La X chiude solo la finestra; il launcher continua accanto all’orologio, ad es. per i download. Per uscire del tutto usa l’icona lì."
+  "Das X schließt nur das Fenster, der Launcher läuft neben der Uhr weiter – z. B. für Downloads. Ganz beenden über das Symbol dort.": "La X chiude solo la finestra; il launcher continua accanto all’orologio, ad es. per i download. Per uscire del tutto usa l’icona lì.",
+  "Auf GitHub": "Su GitHub",
+  "Update auf {v} verfügbar": "Aggiornamento a {v} disponibile",
+  "Siccora Launcher ist aktuell": "Siccora Launcher è aggiornato",
+  "Siccora Launcher {v} installieren?\n\nDas Update wird geladen und geprüft. Danach schließt sich der Launcher kurz und startet von selbst neu.": "Installare Siccora Launcher {v}?\n\nL’aggiornamento viene scaricato e verificato. Poi il launcher si chiude brevemente e si riavvia da solo.",
+  "Laufende Downloads werden pausiert und lassen sich danach fortsetzen.": "I download in corso vengono messi in pausa e potranno riprendere dopo.",
+  "Jetzt aktualisieren": "Aggiorna ora",
+  "Lade Update …": "Download dell’aggiornamento …"
 };

@@ -103,5 +103,11 @@ TEXTS = {
     "Siccora Launcher öffnen": "Siccora Launcher openen",
     "Beenden": "Afsluiten",
     "Der Launcher läuft im Infobereich weiter.": "De launcher blijft actief in het systeemvak.",
-    "Ungültige Autostart-Einstellung.": "Ongeldige instelling voor automatisch starten."
+    "Ungültige Autostart-Einstellung.": "Ongeldige instelling voor automatisch starten.",
+    "Kein Update zum Installieren.": "Geen update om te installeren.",
+    "Update konnte nicht geladen werden.": "De update kon niet worden gedownload.",
+    "Kein passendes Setup im Release gefunden.": "Geen passende installer gevonden in de release.",
+    "Unerwartete Download-Adresse.": "Onverwacht downloadadres.",
+    "Prüfsumme des Updates stimmt nicht – Download verworfen.": "De controlesom van de update klopt niet – download verworpen.",
+    "Das Update ist nicht vom selben Herausgeber signiert – verworfen.": "De update is niet door dezelfde uitgever ondertekend – verworpen."
 }

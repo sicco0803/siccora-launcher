@@ -483,7 +483,15 @@ body { grid-template-columns: 190px minmax(0, 1fr); }
 .acc-manage { color: var(--brand); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .acc-arrow { flex: none; color: var(--muted); font-size: 18px; line-height: 1; transition: transform .15s, color .15s; }
 #acc-open:hover .acc-arrow { color: var(--brand); transform: translateX(2px); }
-#acc-logout { align-self: flex-start; margin: 2px 0 0 20px; }
+.acc-foot { display: flex; align-items: center; gap: 8px; margin: 2px 12px 0 20px; min-height: 18px; }
+#acc-logout { flex: none; }
+.app-version { all: unset; margin-left: auto; cursor: pointer; color: var(--faint); font-size: 11px; letter-spacing: .04em;
+  white-space: nowrap; display: inline-flex; align-items: center; gap: 5px; }
+.app-version:hover { color: var(--ink); }
+.app-version:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.app-version.has-update { color: var(--brand); }
+.app-version.has-update::before { content: ""; width: 6px; height: 6px; background: var(--brand); }
+.status-art .mark { width: 22px; height: 22px; object-fit: contain; }
 
 /* Installierte Spiele: Starten ueber die ganze Breite, Ordner und Pruefen gleich breit darunter */
 .card .actions.game-actions { display: grid; grid-template-columns: repeat(2, minmax(min-content, 1fr)); }

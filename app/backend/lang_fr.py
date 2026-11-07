@@ -103,5 +103,11 @@ TEXTS = {
     "Siccora Launcher öffnen": "Ouvrir Siccora Launcher",
     "Beenden": "Quitter",
     "Der Launcher läuft im Infobereich weiter.": "Le launcher continue de fonctionner dans la zone de notification.",
-    "Ungültige Autostart-Einstellung.": "Réglage de démarrage automatique non valide."
+    "Ungültige Autostart-Einstellung.": "Réglage de démarrage automatique non valide.",
+    "Kein Update zum Installieren.": "Aucune mise à jour à installer.",
+    "Update konnte nicht geladen werden.": "La mise à jour n’a pas pu être téléchargée.",
+    "Kein passendes Setup im Release gefunden.": "Aucun programme d’installation adapté dans la version.",
+    "Unerwartete Download-Adresse.": "Adresse de téléchargement inattendue.",
+    "Prüfsumme des Updates stimmt nicht – Download verworfen.": "La somme de contrôle de la mise à jour ne correspond pas – téléchargement rejeté.",
+    "Das Update ist nicht vom selben Herausgeber signiert – verworfen.": "La mise à jour n’est pas signée par le même éditeur – rejetée."
 }

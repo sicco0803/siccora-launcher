@@ -421,5 +421,12 @@ I18N.pl = {
   "Normal": "Normalnie",
   "Im Infobereich": "W obszarze powiadomień",
   "Beim Schließen im Infobereich weiterlaufen": "Po zamknięciu działaj dalej w obszarze powiadomień",
-  "Das X schließt nur das Fenster, der Launcher läuft neben der Uhr weiter – z. B. für Downloads. Ganz beenden über das Symbol dort.": "X zamyka tylko okno, a launcher działa dalej obok zegara – np. dla pobrań. Aby całkiem zakończyć, użyj ikony w tym miejscu."
+  "Das X schließt nur das Fenster, der Launcher läuft neben der Uhr weiter – z. B. für Downloads. Ganz beenden über das Symbol dort.": "X zamyka tylko okno, a launcher działa dalej obok zegara – np. dla pobrań. Aby całkiem zakończyć, użyj ikony w tym miejscu.",
+  "Auf GitHub": "Na GitHubie",
+  "Update auf {v} verfügbar": "Dostępna aktualizacja do {v}",
+  "Siccora Launcher ist aktuell": "Siccora Launcher jest aktualny",
+  "Siccora Launcher {v} installieren?\n\nDas Update wird geladen und geprüft. Danach schließt sich der Launcher kurz und startet von selbst neu.": "Zainstalować Siccora Launcher {v}?\n\nAktualizacja zostanie pobrana i sprawdzona. Następnie launcher na chwilę się zamknie i sam uruchomi ponownie.",
+  "Laufende Downloads werden pausiert und lassen sich danach fortsetzen.": "Trwające pobierania zostaną wstrzymane i będzie można je potem wznowić.",
+  "Jetzt aktualisieren": "Aktualizuj teraz",
+  "Lade Update …": "Pobieranie aktualizacji …"
 };

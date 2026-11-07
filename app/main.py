@@ -12,9 +12,10 @@ import traceback
 import urllib.parse
 import webbrowser
 
+import requests
 import webview
 
-from backend import autostart, components, freefab, launch, projects, settings
+from backend import autostart, components, freefab, launch, projects, selfupdate, settings
 from backend.tray import Tray
 from backend.downloads import Downloads, hide_servers
 from backend.epic import DATA_DIR, LOGIN_URL, EpicService
@@ -28,7 +29,7 @@ from backend.vault import asset_updates, epic_cached, epic_vault_dirs
 
 # im fertigen Paket liegen ui/ usw. im Entpack-Ordner von PyInstaller
 HERE = getattr(sys, "_MEIPASS", None) or os.path.dirname(os.path.abspath(__file__))
-APP_VERSION = "1.4.0"
+APP_VERSION = "1.0.0"
 
 # Sprache fest in der Adresse: Fab ignoriert die Browsersprache und entscheidet sonst
 # selbst (bei Mike kam so eine fremde Sprache heraus); Fab: ?lang=de, Epic: /de/ bzw. /en-US/
@@ -429,6 +430,29 @@ class Api:
     def store_current(self, which="store"):
         panel = self._panel(which)
         return panel.current() if panel else {"url": None}
+
+    # --- Launcher-Updates (GitHub-Releases) ------------------------------------
+    @_safe
+    def self_update(self, force=False):
+        res = selfupdate.check(APP_VERSION, force)
+        # nur die installierte exe kann sich selbst ersetzen - aus dem Quellcode (Start.bat) nur Hinweis
+        res["canInstall"] = bool(getattr(sys, "frozen", False) and res["setup"])
+        return res
+
+    @_safe
+    def install_self_update(self):
+        info = selfupdate.check(APP_VERSION)
+        if not (getattr(sys, "frozen", False) and info["setup"]):
+            return {"error": tr("Kein Update zum Installieren.")}
+        try:
+            path = selfupdate.download(info)
+        except (ValueError, requests.RequestException) as e:
+            return {"error": tr(str(e)) if isinstance(e, ValueError) else tr("Update konnte nicht geladen werden.")}
+        selfupdate.install(path)
+        # Launcher schliessen, damit das Setup die Dateien ersetzen kann (Downloads werden pausiert)
+        self._close_confirmed = True
+        threading.Thread(target=self._window.destroy, daemon=True).start()
+        return {"ok": True}
 
     @_safe
     def open_url(self, url):

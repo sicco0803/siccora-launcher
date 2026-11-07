@@ -103,5 +103,11 @@ TEXTS = {
     "Siccora Launcher öffnen": "Apri Siccora Launcher",
     "Beenden": "Esci",
     "Der Launcher läuft im Infobereich weiter.": "Il launcher continua a funzionare nell’area di notifica.",
-    "Ungültige Autostart-Einstellung.": "Impostazione di avvio automatico non valida."
+    "Ungültige Autostart-Einstellung.": "Impostazione di avvio automatico non valida.",
+    "Kein Update zum Installieren.": "Nessun aggiornamento da installare.",
+    "Update konnte nicht geladen werden.": "Impossibile scaricare l’aggiornamento.",
+    "Kein passendes Setup im Release gefunden.": "Nessun programma di installazione adatto nella release.",
+    "Unerwartete Download-Adresse.": "Indirizzo di download inatteso.",
+    "Prüfsumme des Updates stimmt nicht – Download verworfen.": "Il checksum dell’aggiornamento non corrisponde – download scartato.",
+    "Das Update ist nicht vom selben Herausgeber signiert – verworfen.": "L’aggiornamento non è firmato dallo stesso editore – scartato."
 }

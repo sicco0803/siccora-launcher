@@ -414,10 +414,48 @@ function assetUpdateCard(a) {
     <button class="btn ghost small" data-go-asset="${esc(a.title)}">${esc(t('Zum Asset'))}</button></div>`;
 }
 
+// Neue Version des Launchers selbst (GitHub-Release)
+function selfUpdateCard(s) {
+  const action = s.canInstall
+    ? `<button class="btn small" data-self-update="1">${esc(t('Update'))}</button>`
+    : s.page ? `<button class="btn ghost small" data-url="${esc(s.page)}">${esc(t('Auf GitHub'))}</button>` : '';
+  return `<div class="status-update">
+    <div class="status-art"><img class="mark" src="siccora-mark.svg" alt=""></div>
+    <div class="status-text"><div class="tile-title">Siccora Launcher</div>
+      <div class="tile-sub">${esc(s.current)} → ${esc(s.latest)}</div></div>
+    ${action}</div>`;
+}
+
+function renderVersion() {
+  const s = state.self;
+  const el = $('#app-version');
+  if (!s) return;
+  el.hidden = false;
+  el.textContent = `v${s.current}`;
+  el.classList.toggle('has-update', !!s.available);
+  el.title = s.available ? t('Update auf {v} verfügbar', { v: s.latest }) : t('Siccora Launcher ist aktuell');
+}
+
+async function checkSelfUpdate(force = false) {
+  try { state.self = await call('self_update', force); } catch { /* offline - beim naechsten Mal */ }
+  renderVersion();
+}
+
+async function installSelfUpdate() {
+  const s = state.self;
+  const running = jobs.some((j) => j.status === 'running' || j.status === 'queued');
+  const text = t('Siccora Launcher {v} installieren?\n\nDas Update wird geladen und geprüft. Danach schließt sich der Launcher kurz und startet von selbst neu.', { v: s.latest })
+    + (running ? `\n\n${t('Laufende Downloads werden pausiert und lassen sich danach fortsetzen.')}` : '');
+  if (!(await askConfirm(text, { ok: 'Jetzt aktualisieren' }))) return;
+  toast(t('Lade Update …'));
+  await call('install_self_update');
+}
+
 function statusUpdates(h) {
-  const n = h.updates.length + h.assetUpdates.length;
+  const self = state.self?.available ? 1 : 0;
+  const n = h.updates.length + h.assetUpdates.length + self;
   const body = state.checking && !n ? `<p class="status-empty">${esc(t('Suche nach Updates …'))}</p>`
-    : n ? h.updates.map(updateCard).join('') + h.assetUpdates.map(assetUpdateCard).join('')
+    : n ? (self ? selfUpdateCard(state.self) : '') + h.updates.map(updateCard).join('') + h.assetUpdates.map(assetUpdateCard).join('')
       : `<p class="status-empty ok">${esc(t('Alles aktuell'))}</p>`;
   return `<section class="status-box ${n ? 'has-updates' : ''}">
     <div class="home-head"><h2>${esc(t('Updates'))}${n ? ` <span class="count">${n}</span>` : ''}</h2>
@@ -1341,6 +1379,7 @@ $('#content').addEventListener('change', async (e) => {
 // --- Ereignisse ----------------------------------------------------------
 document.querySelectorAll('.nav').forEach((b) => (b.onclick = () => show(b.dataset.view)));
 $('#acc-open').onclick = () => show('account');
+$('#app-version').onclick = () => show('home'); // dort steht ein Launcher-Update ganz oben
 $('#refresh').onclick = () => show(state.view, true);
 let searchTimer;
 $('#search').oninput = () => { clearTimeout(searchTimer); searchTimer = setTimeout(render, 150); };
@@ -1376,8 +1415,9 @@ $('#content').addEventListener('click', async (e) => {
     else if (b.dataset.checkUpdates) {
       state.checking = true;
       render();
-      try { state.library = await call('check_updates', true); } finally { state.checking = false; render(); }
+      try { await checkSelfUpdate(true); state.library = await call('check_updates', true); } finally { state.checking = false; render(); }
     }
+    else if (b.dataset.selfUpdate) await installSelfUpdate();
     else if (b.dataset.goAsset) await goToAsset(b.dataset.goAsset);
     else if (b.dataset.goLocal) { state.fabTab = 'local'; await show('fab'); }
     else if (b.dataset.install) await startInstall(b.dataset.install);
@@ -1460,6 +1500,8 @@ async function autoCheckUpdates(atStart = false) {
   state.checking = true;
   if (state.view === 'home') render();
   try {
+    await checkSelfUpdate();  // GitHub wird hoechstens alle 6 Stunden gefragt
+    if (state.self?.available && atStart === true && state.view !== 'home') toast(t('Update auf {v} verfügbar', { v: state.self.latest }));
     const data = await call('check_updates', atStart === true);
     if (data) {
       state.library = data;
@@ -1478,6 +1520,7 @@ async function boot(backend) {
   await setLanguage(detectLanguage(settings.language));
   $('.nav[data-view="games"]').hidden = !settings.showGames;
   pollDownloads();
+  checkSelfUpdate();  // Versionsnummer unten links, auch ohne Anmeldung
   if (await refreshAccount()) {
     await show('home');
     autoCheckUpdates(true);

@@ -421,5 +421,12 @@ I18N.nl = {
   "Normal": "Normaal",
   "Im Infobereich": "In het systeemvak",
   "Beim Schließen im Infobereich weiterlaufen": "Bij sluiten in het systeemvak blijven draaien",
-  "Das X schließt nur das Fenster, der Launcher läuft neben der Uhr weiter – z. B. für Downloads. Ganz beenden über das Symbol dort.": "De X sluit alleen het venster; de launcher blijft naast de klok draaien – bijv. voor downloads. Helemaal afsluiten via het pictogram daar."
+  "Das X schließt nur das Fenster, der Launcher läuft neben der Uhr weiter – z. B. für Downloads. Ganz beenden über das Symbol dort.": "De X sluit alleen het venster; de launcher blijft naast de klok draaien – bijv. voor downloads. Helemaal afsluiten via het pictogram daar.",
+  "Auf GitHub": "Op GitHub",
+  "Update auf {v} verfügbar": "Update naar {v} beschikbaar",
+  "Siccora Launcher ist aktuell": "Siccora Launcher is up-to-date",
+  "Siccora Launcher {v} installieren?\n\nDas Update wird geladen und geprüft. Danach schließt sich der Launcher kurz und startet von selbst neu.": "Siccora Launcher {v} installeren?\n\nDe update wordt gedownload en gecontroleerd. Daarna sluit de launcher even en start hij vanzelf opnieuw.",
+  "Laufende Downloads werden pausiert und lassen sich danach fortsetzen.": "Lopende downloads worden gepauzeerd en kunnen daarna worden hervat.",
+  "Jetzt aktualisieren": "Nu bijwerken",
+  "Lade Update …": "Update downloaden …"
 };

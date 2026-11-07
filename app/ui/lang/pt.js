@@ -421,5 +421,12 @@ I18N.pt = {
   "Normal": "Normal",
   "Im Infobereich": "Na área de notificação",
   "Beim Schließen im Infobereich weiterlaufen": "Continuar na área de notificação ao fechar",
-  "Das X schließt nur das Fenster, der Launcher läuft neben der Uhr weiter – z. B. für Downloads. Ganz beenden über das Symbol dort.": "O X só fecha a janela; o launcher continua junto ao relógio – p. ex. para transferências. Para sair por completo, usa o ícone aí."
+  "Das X schließt nur das Fenster, der Launcher läuft neben der Uhr weiter – z. B. für Downloads. Ganz beenden über das Symbol dort.": "O X só fecha a janela; o launcher continua junto ao relógio – p. ex. para transferências. Para sair por completo, usa o ícone aí.",
+  "Auf GitHub": "No GitHub",
+  "Update auf {v} verfügbar": "Atualização para {v} disponível",
+  "Siccora Launcher ist aktuell": "O Siccora Launcher está atualizado",
+  "Siccora Launcher {v} installieren?\n\nDas Update wird geladen und geprüft. Danach schließt sich der Launcher kurz und startet von selbst neu.": "Instalar o Siccora Launcher {v}?\n\nA atualização é transferida e verificada. Depois, o launcher fecha-se por instantes e reinicia sozinho.",
+  "Laufende Downloads werden pausiert und lassen sich danach fortsetzen.": "As transferências em curso são pausadas e podem ser retomadas depois.",
+  "Jetzt aktualisieren": "Atualizar agora",
+  "Lade Update …": "A transferir a atualização …"
 };

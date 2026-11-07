@@ -32,12 +32,15 @@
     <button id="acc-open">
       <span class="dot" id="acc-dot"></span>
       <span class="acc-text">
-        <span id="acc-name">Nicht angemeldet</span>
+        <span id="acc-name" data-i18n="Nicht angemeldet">Nicht angemeldet</span>
         <span class="acc-manage" id="acc-manage" hidden data-i18n="Konto verwalten">Konto verwalten</span>
       </span>
       <span class="acc-arrow" id="acc-arrow" hidden aria-hidden="true">›</span>
     </button>
-    <button class="link" id="acc-logout" hidden data-i18n="Abmelden">Abmelden</button>
+    <div class="acc-foot">
+      <button class="link" id="acc-logout" hidden data-i18n="Abmelden">Abmelden</button>
+      <button class="app-version" id="app-version" hidden></button>
+    </div>
   </div>
 </aside>
 

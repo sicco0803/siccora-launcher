@@ -435,6 +435,13 @@ const I18N = {
     'Im Infobereich': 'In the notification area',
     'Beim Schließen im Infobereich weiterlaufen': 'Keep running in the notification area when closed',
     'Das X schließt nur das Fenster, der Launcher läuft neben der Uhr weiter – z. B. für Downloads. Ganz beenden über das Symbol dort.': 'The X only closes the window; the launcher keeps running next to the clock – e.g. for downloads. To quit completely, use the icon there.',
+    'Auf GitHub': 'On GitHub',
+    'Update auf {v} verfügbar': 'Update to {v} available',
+    'Siccora Launcher ist aktuell': 'Siccora Launcher is up to date',
+    'Siccora Launcher {v} installieren?\n\nDas Update wird geladen und geprüft. Danach schließt sich der Launcher kurz und startet von selbst neu.': 'Install Siccora Launcher {v}?\n\nThe update is downloaded and verified. The launcher then closes briefly and restarts on its own.',
+    'Laufende Downloads werden pausiert und lassen sich danach fortsetzen.': 'Running downloads are paused and can be resumed afterwards.',
+    'Jetzt aktualisieren': 'Update now',
+    'Lade Update …': 'Downloading update …',
   },
 };
 

@@ -153,6 +153,12 @@ EN = {
     "Beenden": "Quit",
     "Der Launcher läuft im Infobereich weiter.": "The launcher keeps running in the notification area.",
     "Ungültige Autostart-Einstellung.": "Invalid autostart setting.",
+    "Kein Update zum Installieren.": "No update to install.",
+    "Update konnte nicht geladen werden.": "The update could not be downloaded.",
+    "Kein passendes Setup im Release gefunden.": "No matching setup found in the release.",
+    "Unerwartete Download-Adresse.": "Unexpected download address.",
+    "Prüfsumme des Updates stimmt nicht – Download verworfen.": "The update’s checksum does not match – download discarded.",
+    "Das Update ist nicht vom selben Herausgeber signiert – verworfen.": "The update is not signed by the same publisher – discarded.",
 }
 
 LANGUAGES = ("de", "en", "fr", "es", "it", "pl", "pt", "nl")

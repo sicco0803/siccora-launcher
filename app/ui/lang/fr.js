@@ -421,5 +421,12 @@ I18N.fr = {
   "Normal": "Normal",
   "Im Infobereich": "Dans la zone de notification",
   "Beim Schließen im Infobereich weiterlaufen": "Continuer dans la zone de notification à la fermeture",
-  "Das X schließt nur das Fenster, der Launcher läuft neben der Uhr weiter – z. B. für Downloads. Ganz beenden über das Symbol dort.": "Le X ferme seulement la fenêtre ; le launcher continue à côté de l’horloge, p. ex. pour les téléchargements. Pour quitter complètement, utilisez l’icône à cet endroit."
+  "Das X schließt nur das Fenster, der Launcher läuft neben der Uhr weiter – z. B. für Downloads. Ganz beenden über das Symbol dort.": "Le X ferme seulement la fenêtre ; le launcher continue à côté de l’horloge, p. ex. pour les téléchargements. Pour quitter complètement, utilisez l’icône à cet endroit.",
+  "Auf GitHub": "Sur GitHub",
+  "Update auf {v} verfügbar": "Mise à jour vers {v} disponible",
+  "Siccora Launcher ist aktuell": "Siccora Launcher est à jour",
+  "Siccora Launcher {v} installieren?\n\nDas Update wird geladen und geprüft. Danach schließt sich der Launcher kurz und startet von selbst neu.": "Installer Siccora Launcher {v} ?\n\nLa mise à jour est téléchargée et vérifiée. Le launcher se ferme ensuite brièvement et redémarre tout seul.",
+  "Laufende Downloads werden pausiert und lassen sich danach fortsetzen.": "Les téléchargements en cours sont mis en pause et pourront reprendre ensuite.",
+  "Jetzt aktualisieren": "Mettre à jour",
+  "Lade Update …": "Téléchargement de la mise à jour …"
 };
