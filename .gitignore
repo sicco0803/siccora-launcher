@@ -1,0 +1,8 @@
+.venv/
+__pycache__/
+*.json.local
+spike/out/
+build/
+dist/
+installer/Output/
+packaging/version_info.txt

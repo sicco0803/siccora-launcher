@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<!-- Schutz vor eingeschleustem Code: nur eigene Skripte, keine Inline-Skripte, keine fremden Seiten im Fenster.
+     'unsafe-eval' braucht pywebview fuer seine Verbindung zum Python-Teil. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; font-src 'self'; connect-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<title>Siccora Launcher</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body class="home-mode">
+<aside class="side">
+  <div class="brand">
+    <img src="siccora-mark.svg" alt="" width="28" height="28">
+    <span>Siccora<br><small>Launcher</small></span>
+  </div>
+  <nav>
+    <button class="nav active" data-view="home" data-i18n="Übersicht">Übersicht</button>
+    <button class="nav" data-view="games" data-i18n="Spiele">Spiele</button>
+    <button class="nav" data-view="unreal" data-i18n="Unreal Engine">Unreal Engine</button>
+    <button class="nav" data-view="projects" data-i18n="UE-Projekte">UE-Projekte</button>
+    <button class="nav" data-view="fab" data-i18n="Fab-Bibliothek">Fab-Bibliothek</button>
+    <button class="nav" data-view="store" data-i18n="Store">Store</button>
+    <button class="nav" data-view="downloads"><span data-i18n="Downloads">Downloads</span> <span class="count" id="dl-count" hidden></span></button>
+    <button class="nav nav-settings" data-view="settings" data-i18n="Einstellungen">Einstellungen</button>
+  </nav>
+  <div class="mini" id="dl-mini" hidden>
+    <div class="mini-title" id="dl-mini-title"></div>
+    <div class="track"><div class="fill" id="dl-mini-fill"></div></div>
+  </div>
+  <div class="account">
+    <button id="acc-open">
+      <span class="dot" id="acc-dot"></span>
+      <span class="acc-text">
+        <span id="acc-name">Nicht angemeldet</span>
+        <span class="acc-manage" id="acc-manage" hidden data-i18n="Konto verwalten">Konto verwalten</span>
+      </span>
+      <span class="acc-arrow" id="acc-arrow" hidden aria-hidden="true">›</span>
+    </button>
+    <button class="link" id="acc-logout" hidden data-i18n="Abmelden">Abmelden</button>
+  </div>
+</aside>
+
+<main>
+  <header class="bar">
+    <h1 id="view-title" data-i18n="Übersicht">Übersicht</h1>
+    <div class="tools">
+      <input id="search" hidden type="search" placeholder="Suchen …" data-i18n-ph="Suchen …" autocomplete="off">
+      <select id="filter-type" hidden></select>
+      <select id="filter-cat" hidden></select>
+      <select id="filter-sort" hidden>
+        <option value="" data-i18n="Sortierung: Standard">Sortierung: Standard</option>
+        <option value="title" data-i18n="Name A–Z">Name A–Z</option>
+        <option value="category" data-i18n="Kategorie">Kategorie</option>
+        <option value="seller" data-i18n="Verkäufer">Verkäufer</option>
+        <option value="engine" data-i18n="Neueste UE-Version">Neueste UE-Version</option>
+      </select>
+      <select id="filter-engine" hidden><option value="" data-i18n="Alle UE-Versionen">Alle UE-Versionen</option></select>
+      <select id="filter-state" hidden>
+        <option value="" data-i18n="Alle">Alle</option>
+        <option value="installed" data-i18n="Installiert">Installiert</option>
+        <option value="update" data-i18n="Update verfügbar">Update verfügbar</option>
+      </select>
+      <button class="btn ghost" id="refresh" hidden title="Neu von Epic laden" data-i18n-title="Neu von Epic laden" data-i18n="Aktualisieren">Aktualisieren</button>
+    </div>
+  </header>
+  <p class="meta" id="meta"></p>
+  <section id="content"><p class="loading" data-i18n="Lade …">Lade …</p></section>
+  <div id="sentinel"></div>
+</main>
+
+<div class="overlay" id="login" hidden>
+  <div class="panel">
+    <img src="siccora-mark.svg" alt="" width="40" height="40">
+    <h2 data-i18n="Mit Epic anmelden">Mit Epic anmelden</h2>
+    <p class="hint lead" data-i18n="Melde dich mit deinem Epic-Games-Konto an, um Bibliothek, Engines und Fab-Assets zu sehen.">Melde dich mit deinem Epic-Games-Konto an, um Bibliothek, Engines und Fab-Assets zu sehen.</p>
+    <button class="btn big" id="login-start" data-i18n="Mit Epic anmelden">Mit Epic anmelden</button>
+    <p class="hint" id="login-status" data-i18n="Es öffnet sich Epics Anmeldefenster. Dein Passwort geht nur an Epic – diese App sieht es nie.">Es öffnet sich Epics Anmeldefenster. Dein Passwort geht nur an Epic – diese App sieht es nie.</p>
+    <p class="error" id="login-error"></p>
+    <details class="manual">
+      <summary data-i18n="Anmeldung klappt nicht? Code manuell einfügen">Anmeldung klappt nicht? Code manuell einfügen</summary>
+      <ol>
+        <li><button class="btn ghost small" id="login-open" data-i18n="Epic-Anmeldeseite öffnen">Epic-Anmeldeseite öffnen</button></li>
+        <li data-i18n-html="Dort anmelden. Danach zeigt der Browser einen Text mit <code>authorizationCode</code>.">Dort anmelden. Danach zeigt der Browser einen Text mit <code>authorizationCode</code>.</li>
+        <li data-i18n="Den ganzen Text kopieren und hier einfügen:">Den ganzen Text kopieren und hier einfügen:</li>
+      </ol>
+      <textarea id="login-text" rows="3" placeholder='{"warning": … "authorizationCode": "…" …}'></textarea>
+      <button class="btn ghost" id="login-send" data-i18n="Anmelden">Anmelden</button>
+    </details>
+  </div>
+</div>
+
+<div class="overlay" id="preview" hidden>
+  <div class="panel wide-panel">
+    <h2 data-i18n="Update-Vorschau">Update-Vorschau</h2>
+    <div id="preview-body"></div>
+    <div class="panel-actions">
+      <button class="btn ghost" id="preview-close" data-i18n="Abbrechen">Abbrechen</button>
+      <button class="btn" id="preview-start" hidden data-i18n="Update starten">Update starten</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="fabdlg" hidden>
+  <div class="panel wide-panel">
+    <h2 id="fab-heading">Fab-Asset</h2>
+    <div id="fab-body"></div>
+    <div class="panel-actions">
+      <button class="btn ghost" id="fab-close" data-i18n="Abbrechen">Abbrechen</button>
+      <button class="btn" id="fab-go" hidden data-i18n="Installieren">Installieren</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="optdlg" hidden>
+  <div class="panel wide-panel">
+    <h2 id="opt-heading" data-i18n="Optionen">Optionen</h2>
+    <div id="opt-body"></div>
+    <div class="panel-actions">
+      <button class="btn ghost" id="opt-close" data-i18n="Abbrechen">Abbrechen</button>
+      <button class="btn" id="opt-apply" hidden data-i18n="Übernehmen">Übernehmen</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="adddlg" hidden>
+  <div class="panel wide-panel">
+    <h2 id="add-heading"></h2>
+    <div id="add-body"></div>
+    <div class="panel-actions">
+      <button class="btn ghost" id="add-close" data-i18n="Abbrechen">Abbrechen</button>
+      <button class="btn" id="add-go" data-i18n="Installieren">Installieren</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="deldlg" hidden>
+  <div class="panel wide-panel">
+    <h2 data-i18n="Projekt löschen">Projekt löschen</h2>
+    <div id="del-body"></div>
+    <div class="panel-actions">
+      <button class="btn ghost" id="del-close" data-i18n="Abbrechen">Abbrechen</button>
+      <button class="btn danger" id="del-go" hidden disabled data-i18n="In den Papierkorb">In den Papierkorb</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay ask" id="askdlg" hidden role="alertdialog" aria-modal="true" aria-labelledby="ask-title" aria-describedby="ask-body">
+  <div class="panel">
+    <h2 id="ask-title"></h2>
+    <div id="ask-body"></div>
+    <input id="ask-input" type="text" maxlength="60" autocomplete="off" spellcheck="false" hidden>
+    <div class="panel-actions">
+      <button class="btn ghost" id="ask-cancel"></button>
+      <button class="btn" id="ask-ok"></button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+<script src="i18n.js"></script>
+<script src="lang/fr.js"></script>
+<script src="lang/es.js"></script>
+<script src="lang/it.js"></script>
+<script src="lang/pl.js"></script>
+<script src="lang/pt.js"></script>
+<script src="lang/nl.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
