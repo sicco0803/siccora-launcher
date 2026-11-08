@@ -3,6 +3,8 @@
 A lightweight replacement for the Epic Games Launcher, built for working with
 Unreal Engine, DevKits and Fab. Windows only.
 
+Developed and maintained by Mike Rieckhoff ([@sicco0803](https://github.com/sicco0803)).
+
 ## Features
 
 - **Home:** slim update bar with direct links (engines, DevKits, locally stored
@@ -131,6 +133,8 @@ never change it). Sign-in, settings and library are kept; uninstalling removes
 only the program, never installed games, engines or DevKits.
 
 ## License
+
+Copyright (C) 2026 Mike Rieckhoff
 
 Siccora Launcher is licensed under the [GNU General Public License v3.0](LICENSE).
 
