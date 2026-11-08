@@ -75,9 +75,12 @@ def check(current, force=False):
 
 
 def _signer(path):
-    """Herausgeber (Zertifikats-Fingerabdruck) einer signierten Datei, sonst None."""
+    """Herausgeber einer gueltig signierten Datei als "Name|Aussteller-Organisation", sonst None.
+    Bewusst nicht der Fingerabdruck: das Zertifikat wird jaehrlich erneuert, der Fingerabdruck
+    wechselt dabei. Die Organisation stellt sicher, dass es dieselbe Zertifizierungsstelle ist."""
     cmd = ("$s = Get-AuthenticodeSignature -LiteralPath $env:SICCORA_SIGCHECK; "
-           "if ($s.Status -eq 'Valid') { $s.SignerCertificate.Thumbprint }")
+           "if ($s.Status -eq 'Valid') { $c = $s.SignerCertificate; "
+           "$c.GetNameInfo('SimpleName', $false) + '|' + [regex]::Match($c.Issuer, 'O=([^,]+)').Groups[1].Value }")
     out = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", cmd],
                          env=dict(os.environ, SICCORA_SIGCHECK=path), capture_output=True, text=True,
                          timeout=60, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))

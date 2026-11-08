@@ -45,6 +45,11 @@ WizardStyle=modern
 CloseApplications=yes
 RestartApplications=no
 ShowLanguageDialog=auto
+#ifdef UseSigning
+; build.ps1 uebergibt den Signierbefehl - so werden Setup UND Deinstallationsprogramm signiert
+SignTool=siccora
+SignedUninstaller=yes
+#endif
 
 [Languages]
 Name: "de"; MessagesFile: "compiler:Languages\German.isl"

@@ -31,11 +31,15 @@ $out = Join-Path $root "dist\SiccoraLauncher"
 # Code-Signatur (Certum Open Source, SimplySign). Nur aktiv, wenn der Fingerabdruck des
 # Zertifikats gesetzt ist:  $env:SICCORA_SIGN_THUMBPRINT = "<SHA1 aus SimplySign Desktop>"
 # Jede Signatur muss in der SimplySign-App am Handy bestaetigt sein (Sitzung aktiv).
+function Find-SignTool {
+    $found = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" -ErrorAction SilentlyContinue |
+        Sort-Object FullName -Descending | Select-Object -First 1
+    if (-not $found) { throw "signtool.exe nicht gefunden (Windows SDK: winget install Microsoft.WindowsSDK.10.0.26100)" }
+    return $found
+}
 function Sign-File($file) {
     if (-not $env:SICCORA_SIGN_THUMBPRINT) { return }
-    $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" -ErrorAction SilentlyContinue |
-        Sort-Object FullName -Descending | Select-Object -First 1
-    if (-not $signtool) { throw "signtool.exe nicht gefunden (Windows SDK: winget install Microsoft.WindowsSDK.10.0.26100)" }
+    $signtool = Find-SignTool
     & $signtool.FullName sign /sha1 $env:SICCORA_SIGN_THUMBPRINT /fd sha256 /tr "http://time.certum.pl" /td sha256 `
         /d "Siccora Launcher" $file
     if ($LASTEXITCODE -ne 0) { throw "Signieren fehlgeschlagen: $file" }
@@ -74,9 +78,14 @@ if (-not $iscc) {
         Remove-Item $wv2
         throw "WebView2-Installer ist nicht gueltig von Microsoft signiert"
     }
-    & $iscc /Q "/DAppVersion=$version" (Join-Path $PSScriptRoot "installer.iss")
+    $signArgs = @()
+    if ($env:SICCORA_SIGN_THUMBPRINT) {
+        $tool = (Find-SignTool).FullName
+        $signArgs = @("/DUseSigning", "/Ssiccora=`$q$tool`$q sign /sha1 $env:SICCORA_SIGN_THUMBPRINT /fd sha256 /tr http://time.certum.pl /td sha256 /d `$qSiccora Launcher`$q `$f")
+    }
+    & $iscc /Q "/DAppVersion=$version" @signArgs (Join-Path $PSScriptRoot "installer.iss")
     if ($LASTEXITCODE -ne 0) { throw "Inno Setup ist fehlgeschlagen" }
     $setup = Join-Path $root "dist\SiccoraLauncher-$version-Setup.exe"
-    Sign-File $setup
+    if ($env:SICCORA_SIGN_THUMBPRINT -and (Get-AuthenticodeSignature $setup).Status -ne "Valid") { throw "Setup ist nicht gueltig signiert" }
     Write-Host "Fertig: $setup"
 }

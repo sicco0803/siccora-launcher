@@ -57,8 +57,9 @@ Requirements: Windows 10 (version 1809 or newer) or Windows 11. The installer
 checks everything else: if Microsoft Edge WebView2 is missing, it installs it
 with Microsoft's official installer.
 
-The program is not code-signed yet, so Windows SmartScreen may show a warning
-on first start ("More info" → "Run anyway").
+Releases are code-signed (publisher: Open Source Developer Mike Rieckhoff).
+Windows SmartScreen may still warn while a new release builds up reputation
+("More info" → "Run anyway").
 
 ## Development
 
