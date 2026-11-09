@@ -27,6 +27,7 @@ ASSET = re.compile(r"^SiccoraLauncher-(\d+(?:\.\d+){1,3})-Setup\.exe$")
 CACHE = os.path.join(DATA_DIR, "self_update.json")
 UPDATE_DIR = os.path.join(DATA_DIR, "update")
 MAX_AGE = 6 * 3600
+RE_NOTES_BLOCK = re.compile(r"<!--\s*notes:([a-z]{2})\s*\n(.*?)-->", re.S)
 HEADERS = {"Accept": "application/vnd.github+json", "User-Agent": "SiccoraLauncher"}
 
 
@@ -35,6 +36,51 @@ def _version(text):
         return tuple(int(p) for p in str(text).lstrip("vV").split("."))
     except ValueError:
         return ()
+
+
+def parse_notes(body):
+    """Patch Notes aus dem Release-Text: {"en": [Stichpunkte], "de": [...], ...}.
+
+    Englisch steht sichtbar unter "## What's new", die anderen Sprachen in unsichtbaren
+    Bloecken <!-- notes:de ... -->. Nur Stichpunkte, ohne Formatierung; angezeigt als reiner Text.
+    """
+    body = (body or "").replace("\r\n", "\n")
+    notes = {}
+    for code, block in RE_NOTES_BLOCK.findall(body):
+        notes[code] = _bullets(block)
+    visible = RE_NOTES_BLOCK.sub("", body)
+    section = re.search(r"^##\s*What's new\s*$(.*?)(?=^##\s|\Z)", visible, re.M | re.S | re.I)
+    notes["en"] = _bullets(section.group(1) if section else visible)
+    return {k: v for k, v in notes.items() if v}
+
+
+def _bullets(text):
+    out = []
+    for m in re.finditer(r"^\s*[-*•]\s+(.+?)\s*$", text, re.M):
+        line = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", m.group(1))  # Links -> nur der Text
+        line = re.sub(r"[*_`]{1,3}", "", line).strip()
+        if line:
+            out.append(line[:240])
+    return out[:25]
+
+
+def _fetch():
+    """Neuestes Release bei GitHub abfragen."""
+    r = requests.get(API, headers=HEADERS, timeout=20)
+    if r.status_code == 404:  # noch kein Release veroeffentlicht
+        return {"tag": None, "checked": time.time()}
+    r.raise_for_status()
+    data = r.json()
+    setup = None
+    for a in data.get("assets", []):
+        m = ASSET.match(a.get("name", ""))
+        url = a.get("browser_download_url", "")
+        digest = a.get("digest") or ""
+        if m and url.startswith(DOWNLOAD_PREFIX) and digest.startswith("sha256:"):
+            setup = {"name": a["name"], "url": url, "sha256": digest[7:].lower(), "size": a.get("size", 0)}
+    return {"tag": data.get("tag_name"), "page": data.get("html_url"), "draft": data.get("draft"),
+            "prerelease": data.get("prerelease"), "setup": setup, "notes": parse_notes(data.get("body")),
+            "checked": time.time()}
 
 
 def check(current, force=False):
@@ -47,31 +93,20 @@ def check(current, force=False):
     if cached and not force and time.time() - cached.get("checked", 0) < MAX_AGE:
         release = cached
     else:
-        r = requests.get(API, headers=HEADERS, timeout=20)
-        if r.status_code == 404:  # noch kein Release veroeffentlicht
-            release = {"tag": None, "checked": time.time()}
-        else:
-            r.raise_for_status()
-            data = r.json()
-            setup = None
-            for a in data.get("assets", []):
-                m = ASSET.match(a.get("name", ""))
-                url = a.get("browser_download_url", "")
-                digest = a.get("digest") or ""
-                if m and url.startswith(DOWNLOAD_PREFIX) and digest.startswith("sha256:"):
-                    setup = {"name": a["name"], "url": url, "sha256": digest[7:].lower(), "size": a.get("size", 0)}
-            release = {"tag": data.get("tag_name"), "page": data.get("html_url"),
-                       "draft": data.get("draft"), "prerelease": data.get("prerelease"),
-                       "setup": setup, "checked": time.time()}
-        os.makedirs(DATA_DIR, exist_ok=True)
-        with open(CACHE, "w", encoding="utf-8") as f:
-            json.dump(release, f)
+        try:
+            release = _fetch()
+            os.makedirs(DATA_DIR, exist_ok=True)
+            with open(CACHE, "w", encoding="utf-8") as f:
+                json.dump(release, f)
+        except (requests.RequestException, ValueError):  # offline, GitHub-Limit: letzter bekannter Stand
+            release = cached or {"tag": None, "checked": 0}
     latest = (release.get("tag") or "").lstrip("vV") or None
     available = bool(latest) and not release.get("draft") and not release.get("prerelease") \
         and _version(latest) > _version(current)
     page = release.get("page") if str(release.get("page") or "").startswith(f"https://github.com/{REPO}/") else None
     return {"current": current, "latest": latest, "available": available, "page": page,
-            "setup": release.get("setup") if available else None, "checked": release.get("checked")}
+            "setup": release.get("setup") if available else None, "notes": release.get("notes") or {},
+            "checked": release.get("checked")}
 
 
 def _signer(path):

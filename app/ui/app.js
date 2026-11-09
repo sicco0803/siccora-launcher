@@ -441,15 +441,28 @@ async function checkSelfUpdate(force = false) {
   renderVersion();
 }
 
-async function installSelfUpdate() {
+// Vor dem Update zeigen, was neu ist (Patch Notes aus dem GitHub-Release, in der Launcher-Sprache)
+function openSelfUpdate() {
   const s = state.self;
+  const notes = (s.notes && (s.notes[LANG] || s.notes.en)) || [];
   const running = jobs.some((j) => j.status === 'running' || j.status === 'queued');
-  const text = t('Siccora Launcher {v} installieren?\n\nDas Update wird geladen und geprüft. Danach schließt sich der Launcher kurz und startet von selbst neu.', { v: s.latest })
-    + (running ? `\n\n${t('Laufende Downloads werden pausiert und lassen sich danach fortsetzen.')}` : '');
-  if (!(await askConfirm(text, { ok: 'Jetzt aktualisieren' }))) return;
-  toast(t('Lade Update …'));
-  await call('install_self_update');
+  $('#update-heading').textContent = `Siccora Launcher ${s.latest}`;
+  $('#update-versions').textContent = t('Installiert: {v}', { v: s.current });
+  $('#update-notes').innerHTML = notes.length
+    ? `<ul class="update-notes">${notes.map((n) => `<li>${esc(n)}</li>`).join('')}</ul>`
+    : `<p class="home-empty">${esc(t('Für diese Version gibt es keine Beschreibung.'))}</p>`;
+  $('#update-info').textContent = t('Das Update wird geladen und geprüft. Danach schließt sich der Launcher kurz und startet von selbst neu.')
+    + (running ? ` ${t('Laufende Downloads werden pausiert und lassen sich danach fortsetzen.')}` : '');
+  $('#update-go').disabled = false;
+  $('#updatedlg').hidden = false;
 }
+
+$('#update-close').onclick = () => ($('#updatedlg').hidden = true);
+$('#update-go').onclick = async () => {
+  $('#update-go').disabled = true;
+  toast(t('Lade Update …'));
+  try { await call('install_self_update'); } catch (err) { toast(err.message); $('#update-go').disabled = false; }
+};
 
 function statusUpdates(h) {
   const self = state.self?.available ? 1 : 0;
@@ -1066,6 +1079,8 @@ $('#add-go').onclick = async () => {
 };
 
 async function startInstall(appName) {
+  const item = state.library?.items.find((i) => i.appName === appName);
+  if (item?.preview && !(await askConfirm(t('{title} installieren?\n\nDas ist eine Vorabversion von Epic: Sie kann Fehler enthalten und ändert sich bis zur fertigen Version noch. Für echte Projekte besser nicht verwenden.', { title: item.title }), { ok: 'Trotzdem installieren' }))) return;
   let res = await call('install', appName);
   if (res.needsInstallDir) {
     toast(t('Wähle zuerst den Ordner, in den installiert werden soll.'));
@@ -1417,7 +1432,7 @@ $('#content').addEventListener('click', async (e) => {
       render();
       try { await checkSelfUpdate(true); state.library = await call('check_updates', true); } finally { state.checking = false; render(); }
     }
-    else if (b.dataset.selfUpdate) await installSelfUpdate();
+    else if (b.dataset.selfUpdate) openSelfUpdate();
     else if (b.dataset.goAsset) await goToAsset(b.dataset.goAsset);
     else if (b.dataset.goLocal) { state.fabTab = 'local'; await show('fab'); }
     else if (b.dataset.install) await startInstall(b.dataset.install);
@@ -1500,11 +1515,14 @@ async function autoCheckUpdates(atStart = false) {
   state.checking = true;
   if (state.view === 'home') render();
   try {
-    await checkSelfUpdate();  // GitHub wird hoechstens alle 6 Stunden gefragt
+    // Beim Start immer frisch bei GitHub nachsehen, danach hoechstens alle 6 Stunden
+    await checkSelfUpdate(atStart === true);
+    if (state.self?.available && state.view === 'home') render();  // nicht auf die langsamere Epic-Abfrage warten
     if (state.self?.available && atStart === true && state.view !== 'home') toast(t('Update auf {v} verfügbar', { v: state.self.latest }));
     const data = await call('check_updates', atStart === true);
     if (data) {
       state.library = data;
+      if (data.newItems?.length) toast(t('Neu verfügbar: {list}', { list: data.newItems.join(', ') }));
       const upd = data.items.filter((i) => i.updateAvailable && i.installed);
       if (upd.length && state.view !== 'home') toast(t('Update verfügbar: {list}', { list: upd.map((i) => i.title).join(', ') }));
     }
@@ -1520,10 +1538,11 @@ async function boot(backend) {
   await setLanguage(detectLanguage(settings.language));
   $('.nav[data-view="games"]').hidden = !settings.showGames;
   pollDownloads();
-  checkSelfUpdate();  // Versionsnummer unten links, auch ohne Anmeldung
   if (await refreshAccount()) {
     await show('home');
     autoCheckUpdates(true);
+  } else {
+    checkSelfUpdate(true);  // Versionsnummer unten links auch ohne Anmeldung
   }
 }
 

@@ -428,5 +428,12 @@ I18N.es = {
   "Siccora Launcher {v} installieren?\n\nDas Update wird geladen und geprüft. Danach schließt sich der Launcher kurz und startet von selbst neu.": "¿Instalar Siccora Launcher {v}?\n\nLa actualización se descarga y se verifica. Después, el launcher se cierra un momento y se reinicia solo.",
   "Laufende Downloads werden pausiert und lassen sich danach fortsetzen.": "Las descargas en curso se pausan y se pueden reanudar después.",
   "Jetzt aktualisieren": "Actualizar ahora",
-  "Lade Update …": "Descargando actualización …"
+  "Lade Update …": "Descargando actualización …",
+  "{title} installieren?\n\nDas ist eine Vorabversion von Epic: Sie kann Fehler enthalten und ändert sich bis zur fertigen Version noch. Für echte Projekte besser nicht verwenden.": "¿Instalar {title}?\n\nEs una versión preliminar de Epic: puede contener errores y aún cambiará hasta la versión final. Mejor no usarla en proyectos reales.",
+  "Neu verfügbar: {list}": "Novedad: {list}",
+  "Das ist neu": "Novedades",
+  "Später": "Más tarde",
+  "Installiert: {v}": "Instalada: {v}",
+  "Für diese Version gibt es keine Beschreibung.": "Esta versión no tiene descripción.",
+  "Das Update wird geladen und geprüft. Danach schließt sich der Launcher kurz und startet von selbst neu.": "La actualización se descarga y se verifica. Después, el launcher se cierra un momento y se reinicia solo."
 };

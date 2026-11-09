@@ -428,5 +428,12 @@ I18N.nl = {
   "Siccora Launcher {v} installieren?\n\nDas Update wird geladen und geprüft. Danach schließt sich der Launcher kurz und startet von selbst neu.": "Siccora Launcher {v} installeren?\n\nDe update wordt gedownload en gecontroleerd. Daarna sluit de launcher even en start hij vanzelf opnieuw.",
   "Laufende Downloads werden pausiert und lassen sich danach fortsetzen.": "Lopende downloads worden gepauzeerd en kunnen daarna worden hervat.",
   "Jetzt aktualisieren": "Nu bijwerken",
-  "Lade Update …": "Update downloaden …"
+  "Lade Update …": "Update downloaden …",
+  "{title} installieren?\n\nDas ist eine Vorabversion von Epic: Sie kann Fehler enthalten und ändert sich bis zur fertigen Version noch. Für echte Projekte besser nicht verwenden.": "{title} installeren?\n\nDit is een voorlopige versie van Epic: er kunnen fouten in zitten en ze verandert nog tot de definitieve versie. Beter niet gebruiken voor echte projecten.",
+  "Neu verfügbar: {list}": "Nieuw: {list}",
+  "Das ist neu": "Wat is er nieuw",
+  "Später": "Later",
+  "Installiert: {v}": "Geïnstalleerd: {v}",
+  "Für diese Version gibt es keine Beschreibung.": "Voor deze versie is geen beschrijving.",
+  "Das Update wird geladen und geprüft. Danach schließt sich der Launcher kurz und startet von selbst neu.": "De update wordt gedownload en gecontroleerd. Daarna sluit de launcher even en start hij vanzelf opnieuw."
 };

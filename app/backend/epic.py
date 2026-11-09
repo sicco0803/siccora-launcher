@@ -9,6 +9,7 @@ import os
 import re
 import threading
 import time
+import traceback
 
 import requests
 from legendary.core import LegendaryCore
@@ -181,21 +182,65 @@ class EpicService:
         return self._with_install_state(self._fetch_library())
 
     def check_updates(self, min_age=1800):
-        """Nur die aktuellen Versionsnummern neu holen (eine Anfrage statt Komplett-Abgleich)."""
+        """Aktuelle Versionsnummern holen (eine Anfrage). Taucht bei Epic etwas Neues auf (neue
+        Engine, Preview, DevKit, Spiel), wird die Bibliothek einmal komplett neu geladen."""
         data = _load("library.json", None)
         if not data:
             return None
+        announce = []
         if time.time() - data.get("checked", data.get("updated", 0)) >= min_age:
             with self._lock:
                 self.core.login()
-                latest = {a["appName"]: a.get("buildVersion") for a in self.core.egs.get_game_assets(platform="Windows")}
-            for item in data["items"]:
-                item["latest"] = latest.get(item["appName"], item.get("latest"))
+                assets = self.core.egs.get_game_assets(platform="Windows")
+            latest = {a["appName"]: a.get("buildVersion") for a in assets}
+            known = {i["appName"] for i in data["items"]}
+            others = _other_apps(assets)
+            seen = data.get("seenApps")
+            is_new = any(_is_engine(a) and a["appName"] not in known for a in assets) \
+                or (seen is not None and bool(others - set(seen)))
+            refreshed = None
+            if is_new:
+                try:
+                    refreshed = self._fetch_library()
+                except Exception:  # Epic gerade nicht erreichbar - beim naechsten Mal erneut
+                    traceback.print_exc()
+            if refreshed:
+                data = refreshed
+                announce = [i["title"] for i in data["items"] if i["appName"] not in known and i["kind"] in ("engine", "tool")]
+            else:
+                ids = {a["appName"]: a["catalogItemId"] for a in assets}
+                for item in data["items"]:
+                    item["latest"] = latest.get(item["appName"], item.get("latest"))
+                    item["catalogItemId"] = ids.get(item["appName"], item.get("catalogItemId"))
+                if seen is None:
+                    data["seenApps"] = sorted(others)
+                with self._lock:
+                    self._mark_previews(data["items"])  # auch der Wechsel von Preview zur fertigen Version
             data["checked"] = time.time()
             # aktuelle Versionen auch der Fab-Assets merken (Startseite: Asset-Updates)
             _save("asset_versions.json", {"checked": data["checked"], "versions": latest})
             _save("library.json", data)
-        return self._with_install_state(data)
+        return {**self._with_install_state(data), "newItems": announce}
+
+    def _mark_previews(self, items):
+        """Preview-Versionen der Engine erkennen: Epic fuehrt sie unter engines/preview. Immer frisch
+        fragen (nicht aus catalog.json), geprueft werden nur die neuesten und bisherige Previews."""
+        engines = sorted((i for i in items if i["kind"] == "engine"), key=_engine_sort)
+        ids = list({i["catalogItemId"] for i in engines[:3]} | {i["catalogItemId"] for i in engines if i.get("preview")})
+        if not ids:
+            return
+        try:
+            r = self.core.egs.session.get(f"https://{self.core.egs._catalog_host}/catalog/api/shared/namespace/{UE_NS}/bulk/items",
+                                          params=[("id", i) for i in ids] + [("country", "DE"), ("locale", "de")], timeout=60)
+            r.raise_for_status()
+            info = r.json()
+        except (requests.RequestException, ValueError):
+            return  # bisheriger Stand bleibt
+        for item in engines:
+            found = info.get(item["catalogItemId"])
+            if found is not None:
+                item["preview"] = any(c.get("path") == "engines/preview" for c in found.get("categories", []))
+                item["title"] = "Unreal Engine " + item["appName"][3:] + (" Preview" if item["preview"] else "")
 
     def find(self, app_name):
         data = _load("library.json", {"items": []})
@@ -220,7 +265,7 @@ class EpicService:
         for a in assets:
             ns, name = a["namespace"], a["appName"]
             if ns == UE_NS:
-                if not re.match(r"^UE_\d", name):
+                if not _is_engine(a):
                     continue  # Vault-Assets und Plugins kommen ueber Fab
                 items.append({"appName": name, "kind": "engine", "title": "Unreal Engine " + name[3:],
                               "namespace": ns, "catalogItemId": a["catalogItemId"],
@@ -246,7 +291,10 @@ class EpicService:
                           "image": info["image"], "wide": info["wide"], "developer": info["developer"]})
 
         items.sort(key=lambda i: (i["kind"], _engine_sort(i) if i["kind"] == "engine" else i["title"].lower()))
-        data = {"updated": time.time(), "items": items}
+        with self._lock:
+            self._mark_previews(items)
+        now = time.time()
+        data = {"updated": now, "checked": now, "items": items, "seenApps": sorted(_other_apps(assets))}
         _save("library.json", data)
         return data
 
@@ -339,6 +387,15 @@ class EpicService:
 def _version_key(engine):
     nums = re.findall(r"\d+", engine or "")
     return tuple(int(n) for n in nums) or (0,)
+
+
+def _is_engine(asset):
+    return asset["namespace"] == UE_NS and bool(re.match(r"^UE_\d", asset["appName"]))
+
+
+def _other_apps(assets):
+    """Alles ausser Engines und Vault-Inhalten - daran erkennt der Launcher neue DevKits und Spiele."""
+    return {a["appName"] for a in assets if a["namespace"] not in (UE_NS, MEGASCANS_NS)}
 
 
 def _engine_sort(item):

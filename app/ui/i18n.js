@@ -442,6 +442,13 @@ const I18N = {
     'Laufende Downloads werden pausiert und lassen sich danach fortsetzen.': 'Running downloads are paused and can be resumed afterwards.',
     'Jetzt aktualisieren': 'Update now',
     'Lade Update …': 'Downloading update …',
+    '{title} installieren?\n\nDas ist eine Vorabversion von Epic: Sie kann Fehler enthalten und ändert sich bis zur fertigen Version noch. Für echte Projekte besser nicht verwenden.': 'Install {title}?\n\nThis is a pre-release version from Epic: it may contain bugs and will still change before the final version. Better not to use it for real projects.',
+    'Neu verfügbar: {list}': 'New: {list}',
+    'Das ist neu': 'What\'s new',
+    'Später': 'Later',
+    'Installiert: {v}': 'Installed: {v}',
+    'Für diese Version gibt es keine Beschreibung.': 'There is no description for this version.',
+    'Das Update wird geladen und geprüft. Danach schließt sich der Launcher kurz und startet von selbst neu.': 'The update is downloaded and verified. The launcher then closes briefly and restarts on its own.',
   },
 };
 

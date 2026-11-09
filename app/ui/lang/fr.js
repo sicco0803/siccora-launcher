@@ -428,5 +428,12 @@ I18N.fr = {
   "Siccora Launcher {v} installieren?\n\nDas Update wird geladen und geprüft. Danach schließt sich der Launcher kurz und startet von selbst neu.": "Installer Siccora Launcher {v} ?\n\nLa mise à jour est téléchargée et vérifiée. Le launcher se ferme ensuite brièvement et redémarre tout seul.",
   "Laufende Downloads werden pausiert und lassen sich danach fortsetzen.": "Les téléchargements en cours sont mis en pause et pourront reprendre ensuite.",
   "Jetzt aktualisieren": "Mettre à jour",
-  "Lade Update …": "Téléchargement de la mise à jour …"
+  "Lade Update …": "Téléchargement de la mise à jour …",
+  "{title} installieren?\n\nDas ist eine Vorabversion von Epic: Sie kann Fehler enthalten und ändert sich bis zur fertigen Version noch. Für echte Projekte besser nicht verwenden.": "Installer {title} ?\n\nIl s’agit d’une préversion d’Epic : elle peut contenir des bogues et évoluera encore d’ici la version finale. Mieux vaut ne pas l’utiliser pour de vrais projets.",
+  "Neu verfügbar: {list}": "Nouveau : {list}",
+  "Das ist neu": "Nouveautés",
+  "Später": "Plus tard",
+  "Installiert: {v}": "Installée : {v}",
+  "Für diese Version gibt es keine Beschreibung.": "Aucune description pour cette version.",
+  "Das Update wird geladen und geprüft. Danach schließt sich der Launcher kurz und startet von selbst neu.": "La mise à jour est téléchargée et vérifiée. Le launcher se ferme ensuite brièvement et redémarre tout seul."
 };

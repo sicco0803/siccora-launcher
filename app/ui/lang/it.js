@@ -428,5 +428,12 @@ I18N.it = {
   "Siccora Launcher {v} installieren?\n\nDas Update wird geladen und geprüft. Danach schließt sich der Launcher kurz und startet von selbst neu.": "Installare Siccora Launcher {v}?\n\nL’aggiornamento viene scaricato e verificato. Poi il launcher si chiude brevemente e si riavvia da solo.",
   "Laufende Downloads werden pausiert und lassen sich danach fortsetzen.": "I download in corso vengono messi in pausa e potranno riprendere dopo.",
   "Jetzt aktualisieren": "Aggiorna ora",
-  "Lade Update …": "Download dell’aggiornamento …"
+  "Lade Update …": "Download dell’aggiornamento …",
+  "{title} installieren?\n\nDas ist eine Vorabversion von Epic: Sie kann Fehler enthalten und ändert sich bis zur fertigen Version noch. Für echte Projekte besser nicht verwenden.": "Installare {title}?\n\nÈ una versione preliminare di Epic: può contenere errori e cambierà ancora prima della versione finale. Meglio non usarla per progetti reali.",
+  "Neu verfügbar: {list}": "Novità: {list}",
+  "Das ist neu": "Novità",
+  "Später": "Più tardi",
+  "Installiert: {v}": "Installata: {v}",
+  "Für diese Version gibt es keine Beschreibung.": "Nessuna descrizione per questa versione.",
+  "Das Update wird geladen und geprüft. Danach schließt sich der Launcher kurz und startet von selbst neu.": "L’aggiornamento viene scaricato e verificato. Poi il launcher si chiude brevemente e si riavvia da solo."
 };

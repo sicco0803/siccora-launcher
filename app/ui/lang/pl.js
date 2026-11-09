@@ -428,5 +428,12 @@ I18N.pl = {
   "Siccora Launcher {v} installieren?\n\nDas Update wird geladen und geprüft. Danach schließt sich der Launcher kurz und startet von selbst neu.": "Zainstalować Siccora Launcher {v}?\n\nAktualizacja zostanie pobrana i sprawdzona. Następnie launcher na chwilę się zamknie i sam uruchomi ponownie.",
   "Laufende Downloads werden pausiert und lassen sich danach fortsetzen.": "Trwające pobierania zostaną wstrzymane i będzie można je potem wznowić.",
   "Jetzt aktualisieren": "Aktualizuj teraz",
-  "Lade Update …": "Pobieranie aktualizacji …"
+  "Lade Update …": "Pobieranie aktualizacji …",
+  "{title} installieren?\n\nDas ist eine Vorabversion von Epic: Sie kann Fehler enthalten und ändert sich bis zur fertigen Version noch. Für echte Projekte besser nicht verwenden.": "Zainstalować {title}?\n\nTo wersja zapoznawcza od Epic: może zawierać błędy i jeszcze się zmieni przed wersją finalną. Lepiej nie używać jej w prawdziwych projektach.",
+  "Neu verfügbar: {list}": "Nowość: {list}",
+  "Das ist neu": "Co nowego",
+  "Später": "Później",
+  "Installiert: {v}": "Zainstalowana: {v}",
+  "Für diese Version gibt es keine Beschreibung.": "Brak opisu tej wersji.",
+  "Das Update wird geladen und geprüft. Danach schließt sich der Launcher kurz und startet von selbst neu.": "Aktualizacja zostanie pobrana i sprawdzona. Następnie launcher na chwilę się zamknie i sam uruchomi ponownie."
 };

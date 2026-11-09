@@ -498,3 +498,10 @@ body { grid-template-columns: 190px minmax(0, 1fr); }
 .game-actions .btn { min-width: 0; padding-left: 4px; padding-right: 4px; text-align: center;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .game-actions [data-start] { grid-column: 1 / -1; padding-top: 6px; padding-bottom: 6px; }
+
+/* Launcher-Update: Patch Notes vor dem Installieren */
+.update-versions { margin: -8px 0 0; color: var(--faint); font-size: 13px; }
+.update-title { margin: 4px 0 0; font: 500 15px var(--font-display); text-transform: uppercase; letter-spacing: .06em; color: var(--brand); }
+.update-notes { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; max-height: 42vh; overflow-y: auto; }
+.update-notes li { position: relative; padding-left: 16px; color: var(--ink); font-size: 14px; line-height: 1.45; }
+.update-notes li::before { content: ""; position: absolute; left: 0; top: .55em; width: 6px; height: 6px; background: var(--brand); }
