@@ -159,6 +159,16 @@ EN = {
     "Unerwartete Download-Adresse.": "Unexpected download address.",
     "Prüfsumme des Updates stimmt nicht – Download verworfen.": "The update’s checksum does not match – download discarded.",
     "Das Update ist nicht vom selben Herausgeber signiert – verworfen.": "The update is not signed by the same publisher – discarded.",
+    "Übernehmen": "Add existing",
+    "Ordner wird geprüft …": "Checking folder …",
+    "Fertig – Installation übernommen.": "Done – installation added.",
+    "Übernahme fehlgeschlagen.": "Adding the installation failed.",
+    "Dieser Ordner passt nicht zu {title}. Bitte den Hauptordner der Installation wählen.": "This folder does not match {title}. Please choose the main folder of the installation.",
+    "Diese Installation ist schon im Launcher.": "This installation is already in the launcher.",
+    "Bitte den Hauptordner der Installation wählen, nicht das ganze Laufwerk.": "Please choose the main folder of the installation, not the whole drive.",
+    "Dieser Ordner gehört schon zu {title}.": "This folder already belongs to {title}.",
+    "Fertig – Versionsstand aktualisiert, es musste nichts geladen werden.": "Done – version updated, nothing had to be downloaded.",
+    "Bitte zuerst den Unreal Editor schließen.": "Please close the Unreal Editor first.",
 }
 
 LANGUAGES = ("de", "en", "fr", "es", "it", "pl", "pt", "nl")

@@ -4,6 +4,7 @@
   egl_bridge.py export <appName>          - Legendary-Stand an den Epic Launcher zurueckmelden
   egl_bridge.py settags <appName> <a,b>   - gewaehlte Komponenten setzen (nur Verwaltungsdaten)
   egl_bridge.py prune <appName> <a,b>     - Dateien der abgewaehlten Komponenten a,b loeschen
+  egl_bridge.py adopt <appName> <Ordner>  - vorhandene Installation uebernehmen (z. B. aus Heroic)
 """
 import collections
 import os
@@ -40,6 +41,38 @@ def keep_installed_components(core, app):
     core.lgd.config.set(app, "install_tags", ",".join(tags))
     core.lgd.save_config()
     print(f"Erkannte Komponenten: {', '.join(t for t in tags if t) or 'keine optionalen'}")
+
+
+def adopt(core, app, path):
+    """Vorhandenen Ordner als Installation uebernehmen - liest nur, veraendert keine Spieldateien.
+
+    Ohne die Pruefung koennte ein falscher Ordner eingetragen und spaeter "repariert" werden.
+    Optionale Komponenten zaehlen nicht mit: sie fehlen bei vielen Installationen zu Recht.
+    """
+    if core.is_installed(app):  # z. B. Fortsetzen nach einer Pause
+        print(f"{app} ist bereits uebernommen")
+        print("ADOPT_NEEDS_VERIFY" if core.get_installed_game(app).needs_verification else "ADOPT_VERIFIED")
+        return 0
+    game = core.get_game(app, update_meta=True)
+    if not game:
+        print(f"ERROR: {app} nicht in der Bibliothek")
+        return 1
+    manifest, igame = core.import_game(game, path)
+    files = manifest.file_manifest_list.elements
+    base = [f for f in files if not any(t for t in (f.install_tags or []))] or files
+    found = sum(os.path.exists(os.path.join(path, f.filename)) for f in base)
+    exe = (manifest.meta.launch_exe or "").lstrip("/")
+    print(f"Gefunden: {found} von {len(base)} Dateien")
+    if found * 2 < len(base) or (exe and not os.path.exists(os.path.join(path, exe))):
+        print("ADOPT_WRONG_FOLDER")
+        return 1
+    if not core.lgd.lock_installed():
+        print("ERROR: installed data lock")
+        return 1
+    core.install_game(igame)
+    keep_installed_components(core, app)
+    print("ADOPT_NEEDS_VERIFY" if igame.needs_verification else "ADOPT_VERIFIED")
+    return 0
 
 
 def set_tags(core, app, tags):
@@ -101,7 +134,11 @@ def main():
     if not core.login():
         print("ERROR: Nicht angemeldet")
         return 1
-    if action == "import":
+    if action == "adopt":
+        code = adopt(core, app, sys.argv[3])
+        if code:
+            return code
+    elif action == "import":
         if core.is_installed(app):
             print(f"{app} ist bereits uebernommen")
             return 0

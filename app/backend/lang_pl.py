@@ -109,5 +109,15 @@ TEXTS = {
     "Kein passendes Setup im Release gefunden.": "W wydaniu nie znaleziono pasującego instalatora.",
     "Unerwartete Download-Adresse.": "Nieoczekiwany adres pobierania.",
     "Prüfsumme des Updates stimmt nicht – Download verworfen.": "Suma kontrolna aktualizacji się nie zgadza – pobieranie odrzucone.",
-    "Das Update ist nicht vom selben Herausgeber signiert – verworfen.": "Aktualizacja nie jest podpisana przez tego samego wydawcę – odrzucona."
+    "Das Update ist nicht vom selben Herausgeber signiert – verworfen.": "Aktualizacja nie jest podpisana przez tego samego wydawcę – odrzucona.",
+    "Übernehmen": "Przejęcie",
+    "Ordner wird geprüft …": "Sprawdzanie folderu …",
+    "Fertig – Installation übernommen.": "Gotowe – dodano instalację.",
+    "Übernahme fehlgeschlagen.": "Nie udało się dodać instalacji.",
+    "Dieser Ordner passt nicht zu {title}. Bitte den Hauptordner der Installation wählen.": "Ten folder nie pasuje do {title}. Wybierz główny folder instalacji.",
+    "Diese Installation ist schon im Launcher.": "Ta instalacja jest już w launcherze.",
+    "Bitte den Hauptordner der Installation wählen, nicht das ganze Laufwerk.": "Wybierz główny folder instalacji, a nie cały dysk.",
+    "Dieser Ordner gehört schon zu {title}.": "Ten folder należy już do {title}.",
+    "Fertig – Versionsstand aktualisiert, es musste nichts geladen werden.": "Gotowe – zaktualizowano wersję, nie trzeba było nic pobierać.",
+    "Bitte zuerst den Unreal Editor schließen.": "Najpierw zamknij Unreal Editor."
 }

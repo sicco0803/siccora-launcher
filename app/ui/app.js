@@ -15,7 +15,7 @@ const state = { openLogs: new Set(), logs: {}, fabTab: 'library', local: null, v
 let api;
 
 // Deutsche Texte sind die Uebersetzungs-Schluessel (siehe i18n.js)
-const TITLES = { account: 'Konto verwalten', home: 'Übersicht', games: 'Spiele', unreal: 'Unreal Engine', projects: 'UE-Projekte', fab: 'Fab-Bibliothek', store: 'Store', downloads: 'Downloads', settings: 'Einstellungen' };
+const TITLES = { tools: 'Werkzeuge', crashes: 'Abstürze', cleanup: 'Speicher aufräumen', account: 'Konto verwalten', home: 'Übersicht', games: 'Spiele', unreal: 'Unreal Engine', projects: 'UE-Projekte', fab: 'Fab-Bibliothek', store: 'Store', downloads: 'Downloads', settings: 'Einstellungen' };
 const FAB_ACTION = { ASSET_PACK: 'Zum Projekt', CODE_PLUGIN: 'In Engine', COMPLETE_PROJECT: 'Als Projekt' };
 const STATUS = { queued: 'Wartet', running: 'Läuft', paused: 'Pausiert', done: 'Fertig', failed: 'Fehler', cancelled: 'Abgebrochen' };
 const OPEN = ['queued', 'running', 'paused'];
@@ -650,6 +650,7 @@ async function openPreview(appName) {
     return;
   }
   const comps = p.components.length ? p.components.join(', ') : t('keine optionalen');
+  const onlyVersion = p.upToDate && p.oldVersion !== p.newVersion;
   const removed = p.removed
     ? `<div class="note${p.removed > 50 ? ' bad' : ''}"><strong>${esc(t('{n} Dateien', { n: p.removed }))}</strong> ${esc(t('gibt es in der neuen Version nicht mehr und werden entfernt.'))}
          ${esc(t('Deine eigenen Dateien (z. B. Mod-Projekte) sind nicht betroffen – entfernt wird nur, was Epic selbst installiert hat.'))}
@@ -666,9 +667,10 @@ async function openPreview(appName) {
       <dt>${esc(t('Dateien'))}</dt><dd>${esc(t('{c} geändert · {a} neu · {r} entfällt', { c: p.changed, a: p.added, r: p.removed }))}</dd>
       <dt>${esc(t('Platz frei'))}</dt><dd>${mb(p.freeMb)}${p.enoughSpace ? '' : esc(t(' – zu wenig!'))}</dd>`}
     </dl>
-    ${p.upToDate ? `<p class="note">${esc(t('Bereits aktuell – nichts zu tun.'))}</p>` : removed}
+    ${p.upToDate ? `<p class="note">${esc(t(onlyVersion ? 'Es haben sich keine Dateien geändert, nur die Versionsnummer. Es wird nichts heruntergeladen, nur der Stand wird aktualisiert.' : 'Bereits aktuell – nichts zu tun.'))}</p>` : removed}
     ${!p.upToDate && p.source === 'egl' ? `<p class="note">${esc(t('Wurde mit dem Epic Launcher installiert. Er bekommt den neuen Stand danach automatisch mitgeteilt.'))}</p>` : ''}`;
-  $('#preview-start').hidden = p.upToDate || !p.enoughSpace;
+  // Neue Versionsnummer ohne geaenderte Dateien: das Update muss trotzdem laufen, sonst bleibt die Meldung stehen
+  $('#preview-start').hidden = p.upToDate ? !onlyVersion : !p.enoughSpace;
   $('#preview-start').onclick = async () => {
     $('#preview').hidden = true;
     await call('update', appName);
@@ -1066,6 +1068,8 @@ async function openAdd(kind) {
       <button class="btn ghost small" id="add-dir">${esc(t('Ändern'))}</button></div></div>`
     : `<p class="home-empty">${esc(t(`Alle verfügbaren ${what}s sind installiert.`))}</p>`;
   $('#add-go').hidden = !items.length;
+  $('#add-go').textContent = t('Installieren');
+  state.adopt = null;
   $('#adddlg').hidden = false;
   const dir = $('#add-dir');
   if (dir) dir.onclick = async () => { if (!(await call('choose_install_dir')).cancelled) openAdd(kind); };
@@ -1074,9 +1078,50 @@ async function openAdd(kind) {
 $('#add-close').onclick = () => ($('#adddlg').hidden = true);
 $('#add-go').onclick = async () => {
   const app = $('#add-app').value;
+  if (state.adopt) {
+    if (!state.adopt.path) { toast(t('Bitte zuerst den Ordner wählen.')); return; }
+    try {
+      await call('adopt_install', app, state.adopt.path);
+      $('#adddlg').hidden = true;
+      toast(t('Zur Warteschlange hinzugefügt.'));
+      await pollDownloads.once();
+    } catch (err) { toast(err.message); }
+    return;
+  }
   $('#adddlg').hidden = true;
   try { await startInstall(app); } catch (err) { toast(err.message); }
 };
+
+// Vorhandene Engine oder vorhandenes DevKit uebernehmen (z. B. aus Heroic), ohne neuen Download
+async function openAdopt(kind) {
+  const data = await loadLibrary();
+  const { heroic } = await call('adopt_options');
+  const items = data.items.filter((i) => i.kind === kind && !i.installed && !busy(i.appName)).sort((a, b) =>
+    (heroic[b.appName] ? 1 : 0) - (heroic[a.appName] ? 1 : 0)
+      || (kind === 'engine' ? b.title.localeCompare(a.title, undefined, { numeric: true }) : a.title.localeCompare(b.title)));
+  state.adopt = { kind, heroic, path: items[0] ? heroic[items[0].appName] || null : null };
+  const label = (i) => `${i.title}${heroic[i.appName] ? ` (${t('in Heroic gefunden')})` : ''}`;
+  $('#add-heading').textContent = t({ engine: 'Vorhandene Engine hinzufügen', game: 'Vorhandenes Spiel hinzufügen' }[kind] || 'Vorhandenes DevKit hinzufügen');
+  $('#add-body').innerHTML = items.length ? `
+    <label class="field"><span>${esc(t({ engine: 'Unreal-Engine-Version', game: 'Spiel aus deiner Epic-Bibliothek' }[kind] || 'DevKit oder Tool'))}</span>
+      <select id="add-app">${items.map((i) => `<option value="${esc(i.appName)}">${esc(label(i))}</option>`).join('')}</select></label>
+    <div class="field"><span>${esc(t('Installationsordner'))}</span><div class="pick">
+      <code id="adopt-path"></code>
+      <button class="btn ghost small" id="adopt-dir">${esc(t('Ändern'))}</button></div></div>
+    <p class="note">${esc(t('Es wird nichts neu heruntergeladen. Der Launcher prüft, ob der Ordner zum gewählten Eintrag passt. Stammt die Installation nicht aus dem Epic Launcher, werden danach alle Dateien geprüft; das kann eine Weile dauern. Nur Fehlendes oder Veraltetes wird nachgeladen.'))}</p>`
+    : `<p class="home-empty">${esc(t('Nichts gefunden.'))}</p>`;
+  $('#add-go').hidden = !items.length;
+  $('#add-go').textContent = t('Hinzufügen');
+  $('#adddlg').hidden = false;
+  if (!items.length) return;
+  const showPath = () => ($('#adopt-path').textContent = state.adopt.path || t('noch nicht festgelegt'));
+  showPath();
+  $('#add-app').onchange = () => { state.adopt.path = heroic[$('#add-app').value] || null; showPath(); };
+  $('#adopt-dir').onclick = async () => {
+    const p = await call('choose_folder');
+    if (!p.cancelled) { state.adopt.path = p.path; showPath(); }
+  };
+}
 
 async function startInstall(appName) {
   const item = state.library?.items.find((i) => i.appName === appName);
@@ -1118,8 +1163,9 @@ async function render() {
   const fabFilters = v !== 'fab' || state.fabTab === 'local';
   $('#filter-engine').hidden = $('#filter-type').hidden = $('#filter-cat').hidden = $('#filter-sort').hidden = fabFilters;
   $('#filter-state').hidden = v !== 'games';
-  $('#search').hidden = $('#refresh').hidden = ['home', 'store', 'account', 'downloads', 'settings'].includes(v);
-  if (v === 'unreal') $('#search').hidden = true;
+  $('#search').hidden = $('#refresh').hidden = ['home', 'store', 'account', 'downloads', 'settings', 'tools'].includes(v);
+  if (v === 'unreal' || v === 'cleanup') $('#search').hidden = true;
+  if (v === 'crashes') $('#search').hidden = false;
   const none = `<p class="empty">${esc(t('Nichts gefunden.'))}</p>`;
 
   if (v === 'settings') {
@@ -1184,6 +1230,10 @@ async function render() {
     return;
   }
 
+  if (v === 'tools') return renderTools();
+  if (v === 'cleanup') return renderCleanup();
+  if (v === 'crashes') return renderCrashes();
+
   if (v === 'account') {
     $('#meta').textContent = '';
     $('#content').innerHTML = `<div class="store-bar"><div class="store-nav">
@@ -1229,7 +1279,7 @@ async function render() {
     </div>
     <aside class="home-status">
       ${statusUpdates(h)}
-      <section class="status-box"><div class="home-head"><h2>${esc(t('Speicherplatz'))}</h2></div><div id="status-storage"><p class="status-empty">${esc(t('Lade …'))}</p></div></section>
+      <section class="status-box"><div class="home-head"><h2>${esc(t('Speicherplatz'))}</h2><button class="link" data-view-go="cleanup">${esc(t('Aufräumen'))}</button></div><div id="status-storage"><p class="status-empty">${esc(t('Lade …'))}</p></div></section>
     </aside></div>`;
     loadThumbs();
     loadFree();
@@ -1284,10 +1334,10 @@ async function render() {
       { n: items.length, total: all.length, inst: all.filter((i) => i.installed).length, ago: ago(data.updated) });
     // Eigener Bereich fuer Installiertes, darunter der Rest seitenweise
     renderPaged(others, gameCard, '');
-    if (installed.length) {
+    {  // Kopf immer zeigen: dort sitzt "Vorhandenes hinzufuegen"
       $('#content').insertAdjacentHTML('afterbegin', `<section class="items-block">
-        <div class="home-head"><h2>${esc(t('Installierte Spiele'))}</h2></div>
-        <div class="grid">${installed.map(gameCard).join('')}</div></section>
+        <div class="home-head"><h2>${esc(t('Installierte Spiele'))}</h2><div class="home-actions"><button class="btn ghost small" data-adopt-kind="game">${esc(t('Vorhandene hinzufügen'))}</button></div></div>
+        ${installed.length ? `<div class="grid">${installed.map(gameCard).join('')}</div>` : `<p class="home-empty">${esc(t('Noch kein Spiel installiert.'))}</p>`}</section>
         <div class="home-head games-rest"><h2>${esc(t('Nicht installiert'))}</h2></div>`);
     }
     return;
@@ -1298,7 +1348,7 @@ async function render() {
   const engines = shown('engine').sort((a, b) => b.title.localeCompare(a.title, undefined, { numeric: true }));
   const tools = shown('tool').sort((a, b) => a.title.localeCompare(b.title));
   const block = (title, kind, label, items, empty) => `<section class="items-block">
-    <div class="home-head"><h2>${esc(t(title))}</h2><button class="btn ghost small" data-add-kind="${kind}">${esc(t(label))}</button></div>
+    <div class="home-head"><h2>${esc(t(title))}</h2><div class="home-actions"><button class="btn ghost small" data-adopt-kind="${kind}">${esc(t('Vorhandene hinzufügen'))}</button><button class="btn ghost small" data-add-kind="${kind}">${esc(t(label))}</button></div></div>
     ${items.length ? `<div class="items">${items.map(itemTile).join('')}</div>` : `<p class="home-empty">${esc(t(empty))}</p>`}</section>`;
   state.list = [];
   $('#meta').textContent = t('{e} Engines und {t} Tools installiert · Stand {ago}',
@@ -1342,19 +1392,379 @@ window.addEventListener('resize', () => {
   window.__storeResize = setTimeout(() => { const r = storeRect(); if (r) call('store_resize', r, state.view); }, 80);
 });
 
+// --- Abstuerze: Berichte von Unreal in normaler Sprache (alles lokal) ------------
+const CRASH_CATEGORIES = {
+  vram: ['Grafikspeicher voll', 'Die Grafikkarte hatte keinen freien Speicher mehr für Texturen oder Meshes.', [
+    'Andere Programme mit Grafiklast schließen (Browser, Spiele, Videos, ein zweiter Editor).',
+    'Die Qualität im Viewport senken: Settings → Engine Scalability Settings → Medium oder Low.',
+    'Bei großen Maps weniger Regionen gleichzeitig laden (World Partition: nur die benötigten Bereiche).',
+    'Sehr große Texturen (4K/8K) prüfen und wo möglich verkleinern, zum Beispiel über „Maximum Texture Size“.',
+  ]],
+  gpu: ['Grafikkarte hat nicht mehr reagiert', 'Der Grafiktreiber hat die Verbindung zur Grafikkarte verloren, etwa durch einen Treiberabsturz oder eine Zeitüberschreitung.', [
+    'Den Grafiktreiber auf die neueste Version aktualisieren (Studio-Treiber laufen oft stabiler).',
+    'Übertaktung von Grafikkarte und Arbeitsspeicher abschalten, auch eine Werksübertaktung.',
+    'Die Qualität im Viewport senken: Settings → Engine Scalability Settings → Medium oder Low.',
+    'Passiert es immer an derselben Stelle, dort zuerst schwere Effekte, Lumen oder sehr detaillierte Meshes prüfen.',
+  ]],
+  memory: ['Arbeitsspeicher voll', 'Windows konnte dem Editor keinen weiteren Arbeitsspeicher geben.', [
+    'Andere Programme schließen, besonders Browser mit vielen Tabs.',
+    'Die Auslagerungsdatei von Windows verwalten lassen und auf dem Systemlaufwerk mindestens 32 GB frei halten.',
+    'Bei großen Maps weniger Regionen gleichzeitig laden (World Partition: nur die benötigten Bereiche).',
+    'Beim Cooken oder Erzeugen von HLODs keinen zweiten Editor offen haben.',
+  ]],
+  shader: ['Problem mit einem Shader', 'Beim Übersetzen oder Laden eines Shaders ist etwas schiefgegangen.', [
+    'Das zuletzt bearbeitete Material öffnen und auf Fehler prüfen (rote Knoten, fehlende Texturen).',
+    'Den Editor neu starten – manchmal war nur ein einzelner Durchlauf fehlerhaft.',
+    'Hilft das nicht: unter Werkzeuge → Speicher aufräumen den Shader- und Textur-Zwischenspeicher löschen. Das nächste Öffnen dauert dann länger.',
+  ]],
+  worldpartition: ['Problem mit World Partition, HLOD oder Landscape', 'Der Fehler trat beim Laden, Bearbeiten oder Aufbauen einer großen Map auf.', [
+    'Wurden gerade HLODs erzeugt? Dann diesen Schritt mit einer kleineren Region oder einzelnen HLOD-Layern wiederholen.',
+    'Beim Bearbeiten der Landscape: den zuletzt bearbeiteten Bereich und dessen Layer prüfen.',
+    'Die Protokolle unter Saved/WorldPartition nennen oft das betroffene Objekt.',
+  ]],
+  save: ['Fehler beim Speichern eines Assets', 'Ein Asset ließ sich nicht speichern, meist wegen eines ungültigen Verweises.', [
+    'Das oben genannte Asset öffnen und auf fehlende oder ungültige Verweise prüfen.',
+    'Im Content Browser per Rechtsklick auf den Ordner „Fix Up Redirectors“ ausführen.',
+    'Verweist das Asset auf etwas aus einer anderen Map oder einem anderen Mod, diesen Verweis entfernen.',
+  ]],
+  asset: ['Asset fehlt oder ist beschädigt', 'Ein Asset konnte nicht geladen werden – es fehlt, ist beschädigt oder stammt aus einer anderen Version.', [
+    'Prüfen, ob das oben genannte Asset noch existiert.',
+    'Beschädigte Assets aus einem Backup holen oder neu importieren.',
+    'Fehlen Dateien des DevKits oder der Engine selbst: die Installation im Launcher prüfen lassen (Verify).',
+  ]],
+  blueprint: ['Problem in einem Blueprint', 'Ein Blueprint hat beim Ausführen oder Kompilieren einen Fehler ausgelöst.', [
+    'Den genannten Blueprint öffnen und „Compile“ klicken – Fehler stehen danach im Compiler-Fenster.',
+    'Zuletzt geänderte Knoten prüfen, besonders Casts und Zugriffe auf leere Variablen (None).',
+  ]],
+  assert: ['Interne Prüfung der Engine fehlgeschlagen', 'Unreal hat einen Zustand erkannt, der nie vorkommen sollte, und sich sicherheitshalber beendet.', [
+    'Unter „Beteiligt“ und „Gerade offen“ steht, wo es passiert ist – dort zuerst suchen.',
+    'Prüfen, ob es bei demselben Schritt wieder passiert. Wenn ja, liegt es meist an diesem Inhalt.',
+    'Ohne erkennbaren Auslöser ist es oft ein Fehler der Engine, den erst ein Update behebt. Dann hilft eine Meldung an den Hersteller mit der Originalmeldung.',
+  ]],
+  ensure: ['Warnung der Engine', 'Unreal hat etwas Unerwartetes bemerkt, aber weitergearbeitet.', [
+    'Meist nichts zu tun, solange der Editor normal weiterläuft.',
+    'Häufen sich diese Warnungen bei einem Asset, dieses genauer prüfen.',
+  ]],
+  access: ['Zugriffsfehler im Programm', 'Der Editor hat auf ungültige Daten zugegriffen (Access Violation).', [
+    'Ist unter „Beteiligt“ ein Plugin genannt: dieses aktualisieren oder testweise deaktivieren.',
+    'Prüfen, ob es bei demselben Schritt wieder passiert. Wenn ja, liegt es meist an diesem Inhalt.',
+    'Bei Blueprint-Warnungen in den letzten Log-Zeilen zuerst diese Blueprints prüfen.',
+    'Den Grafiktreiber auf die neueste Version aktualisieren (Studio-Treiber laufen oft stabiler).',
+  ]],
+  hang: ['Editor reagierte nicht mehr', 'Der Editor hing zu lange an einer Aufgabe fest und wurde beendet.', [
+    'Bei großen Maps oder vielen Shadern mehr Zeit geben – nach einem Neustart ist der Zwischenspeicher oft schon gefüllt.',
+    'Prüfen, ob das Laufwerk fast voll oder sehr langsam ist. DevKits gehören auf eine SSD.',
+    'Passiert es immer beim selben Schritt, diesen in kleineren Teilen ausführen.',
+  ]],
+  unknown: ['Nicht erkannt', 'Für diesen Fehler gibt es noch keine Erklärung.', [
+    'Die letzten Warnungen und Fehler vor dem Absturz zeigen oft, was kurz vorher schiefging.',
+    'Mit der Originalmeldung im Internet oder in der Community suchen.',
+  ]],
+  unreadable: ['Nicht auswertbar', 'Dieser Bericht ließ sich nicht lesen. Eventuell ist er unvollständig oder hat ein anderes Format.', [
+  ]],
+};
+
+const CRASH_AREAS = {
+  directx: 'Grafik (DirectX)',
+  vulkan: 'Grafik (Vulkan)',
+  render: 'Darstellung (Renderer)',
+  landscape: 'Landscape',
+  foliage: 'Foliage',
+  worldpartition: 'World Partition',
+  ddc: 'Zwischenspeicher (DDC)',
+  audio: 'Audio',
+  shader: 'Shader',
+  material: 'Material-Editor',
+  niagara: 'Niagara (Effekte)',
+  browser: 'Eingebetteter Browser',
+  physics: 'Physik (Chaos)',
+};
+
+function crashActivity(a) {
+  if (!a) return '';
+  if (a.kind === 'exit') return t('Beim Beenden des Editors');
+  if (a.kind === 'viewport') return t('Im Viewport');
+  const label = { mode: 'Modus „{name}“', editor: 'Editor für „{name}“', tool: 'Werkzeug „{name}“' }[a.kind] || 'Fenster „{name}“';
+  return t(label, { name: a.name });
+}
+
+function crashCulprit(c) {
+  if (!c) return '';
+  if (c.kind === 'plugin') return t('Plugin „{name}“', c);
+  if (c.kind === 'project') return t('Code des Projekts ({name})', c);
+  if (c.kind === 'game') return t('Spielcode des DevKits ({name})', c);
+  return CRASH_AREAS[c.name] ? t(CRASH_AREAS[c.name]) : '';
+}
+
+// --- "KI fragen": Frage vorbereiten, im Backend bereinigen, Nutzer sieht und kann aendern ---
+function crashPrompt(i) {
+  const lines = [t('Mein Unreal Editor ist abgestürzt. Bitte erkläre mir die wahrscheinliche Ursache und wie ich das Problem Schritt für Schritt behebe.'), ''];
+  const add = (label, value) => { if (value) lines.push(`${t(label)}: ${value}`); };
+  add('Umgebung', [i.version && `Unreal Engine ${i.version}`, i.project].filter(Boolean).join(' – '));
+  add('Art des Absturzes', t(CRASH_CATEGORIES[i.category][0]));
+  add('Gerade offen', crashActivity(i.activity));
+  add('Beteiligt', crashCulprit(i.culprit));
+  add(i.assetSource === 'log' ? 'Zuletzt im Log genannt' : 'Betroffenes Asset', i.asset);
+  add('Speicher', crashMemory(i));
+  add('Wie oft', t('{n}×', { n: i.count }));
+  if (i.message) lines.push('', `${t('Fehlermeldung')}:`, i.message.trim());
+  if (i.log && i.log.length) {
+    lines.push('', `${t('Letzte Warnungen und Fehler vor dem Absturz')}:`, ...i.log.map((l) => `${l.count > 1 ? `${l.count}× ` : ''}${l.text}`));
+  }
+  return lines.join('\n');
+}
+
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); return; } catch { /* Ersatzweg unten */ }
+  const area = document.createElement('textarea');
+  area.value = text;
+  document.body.appendChild(area);
+  area.select();
+  try { document.execCommand('copy'); } catch { /* dann eben nur im Browser */ }
+  area.remove();
+}
+
+async function openAskAi(item) {
+  if (!item) return;
+  const dlg = $('#aidlg');
+  const area = $('#ai-text');
+  area.value = (await call('ai_prompt', crashPrompt(item))).text;
+  const close = () => { dlg.hidden = true; dlg.onclick = dlg.onkeydown = null; };
+  dlg.hidden = false;
+  area.scrollTop = 0;
+  dlg.querySelectorAll('[data-ai-provider]').forEach((b) => {
+    b.onclick = async () => {
+      await copyText(area.value);
+      try {
+        await call('ask_ai', b.dataset.aiProvider, area.value);
+        toast(t('Browser wird geöffnet – der Text liegt auch in der Zwischenablage.'));
+      } catch (err) {
+        toast(err.message);
+      }
+      close();
+    };
+  });
+  $('#ai-close').onclick = close;
+  dlg.onclick = (e) => { if (e.target === dlg) close(); };
+  dlg.onkeydown = (e) => { if (e.key === 'Escape') close(); };
+  dlg.querySelector('[data-ai-provider]').focus();
+}
+
+function crashMemory(i) {
+  const f = i.facts || {};
+  if (i.category === 'vram' && f.vramBudget) return t('Grafikspeicher: {used} von {total} belegt', { used: mb(f.vramUsed || 0), total: mb(f.vramBudget) });
+  if (i.category === 'memory' && f.ramTotal) return t('Arbeitsspeicher: {used} von {total} belegt', { used: mb(f.ramUsed || 0), total: mb(f.ramTotal) });
+  return '';
+}
+
+async function renderCrashes() {
+  $('#meta').textContent = '';
+  if (!state.crashes) {
+    $('#content').innerHTML = `${toolTabs()}<p class="loading">${esc(t('Lese Absturzberichte …'))}</p>`;
+    state.crashes = await call('crash_reports');
+    if (state.view !== 'crashes') return;
+  }
+  const { items, total, projects } = state.crashes;
+  $('#meta').textContent = t('{n} Berichte in {p} Projekten', { n: total, p: projects });
+  const names = [...new Set(items.map((i) => i.project))].sort((a, b) => a.localeCompare(b));
+  if (state.crashProject && !names.includes(state.crashProject)) state.crashProject = '';
+  const shown = state.crashShown = items.filter((i) => (!state.crashProject || i.project === state.crashProject)
+    && matches(`${t(CRASH_CATEGORIES[i.category][0])} ${i.message} ${i.project} ${i.asset || ''} ${crashCulprit(i.culprit)}`));
+  const card = (i, n) => {
+    const [title, what, steps] = CRASH_CATEGORIES[i.category];
+    const facts = [
+      ['Gerade offen', crashActivity(i.activity)],
+      ['Beteiligt', crashCulprit(i.culprit)],
+      [i.assetSource === 'log' ? 'Zuletzt im Log genannt' : 'Betroffenes Asset', i.asset],
+      ['Speicher', crashMemory(i)],
+    ].filter(([, v]) => v);
+    const log = (i.log || []).map((l) => `${l.count > 1 ? `${l.count}× ` : ''}${l.text}`).join('\n');
+    return `<article class="crash">
+      <div class="crash-head"><h3>${esc(t(title))}</h3><span class="crash-count">${esc(t('{n}×', { n: i.count }))}</span></div>
+      <p class="crash-tip">${esc(t(what))}</p>
+      ${facts.length ? `<dl class="crash-facts">${facts.map(([k, v]) => `<div><dt>${esc(t(k))}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>` : ''}
+      ${steps.length ? `<div class="crash-steps"><span>${esc(t('Das kannst du tun'))}</span><ol>${steps.map((x) => `<li>${esc(t(x))}</li>`).join('')}</ol></div>` : ''}
+      <p class="crash-meta">${esc([i.project, i.version && `UE ${i.version}`, t('Zuletzt {ago}', { ago: ago(i.last) })].filter(Boolean).join(' · '))}</p>
+      <div class="crash-foot"><div class="crash-more">
+        ${log ? `<details><summary>${esc(t('Letzte Warnungen und Fehler vor dem Absturz'))}</summary><pre>${esc(log)}</pre></details>` : ''}
+        ${i.message ? `<details><summary>${esc(t('Originalmeldung anzeigen'))}</summary><pre>${esc(i.message)}</pre></details>` : ''}
+      </div><div class="crash-buttons">${i.category !== 'unreadable' ? `<button class="btn ghost small" data-ask-ai="${n}">${esc(t('KI fragen'))}</button>` : ''}
+        <button class="btn ghost small" data-folder="${esc(i.folder)}">${esc(t('Ordner'))}</button></div></div></article>`;
+  };
+  $('#content').innerHTML = `${toolTabs()}<div class="crashes">
+    <p class="note">${esc(t('Die Einordnung ist ein Anhaltspunkt und nennt nicht immer die genaue Ursache. Die Berichte werden nur hier auf deinem PC gelesen.'))}</p>
+    ${names.length > 1 ? `<label class="field crash-filter"><span>${esc(t('Projekt'))}</span><select id="crash-project"><option value="">${esc(t('Alle Projekte'))}</option>${names.map((n) => `<option value="${esc(n)}" ${n === state.crashProject ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></label>` : ''}
+    ${shown.length ? shown.map((i, n) => card(i, n)).join('') : `<p class="empty">${esc(t(total ? 'Nichts gefunden.' : 'Keine Absturzberichte gefunden.'))}</p>`}
+  </div>`;
+  const filter = $('#crash-project');
+  if (filter) filter.onchange = () => { state.crashProject = filter.value; renderCrashes(); };
+}
+
+// --- Speicher aufraeumen: nur unkritische Ordner, nichts vorausgewaehlt ----------
+const CLEAN_CATEGORIES = {
+  logs: ['Protokolle', 'Protokolle des Editors. Werden bei jedem Start neu angelegt.'],
+  crashes: ['Absturzberichte', 'Berichte zu früheren Abstürzen. Nur nötig, wenn du diese noch untersuchen möchtest.'],
+  worldpartition: ['World-Partition-Protokolle', 'Protokolle vom Aufbau großer Maps. Werden bei Bedarf neu angelegt.'],
+  shaderdebug: ['Shader-Debug-Daten', 'Daten für die Fehlersuche bei Shadern. Für die normale Arbeit nicht nötig.'],
+  materialstats: ['Material-Statistiken', 'Auswertungen zu Materialien. Werden bei Bedarf neu angelegt.'],
+  localcook: ['Lokale Cooks', 'Ergebnisse lokaler Cooks des DevKits (ModTools/Output). Werden beim nächsten Cook neu erzeugt.'],
+  ddc: ['Shader- und Textur-Zwischenspeicher', 'Berechnete Shader und Texturen. Unreal erzeugt sie neu, das nächste Öffnen dauert dann aber deutlich länger.'],
+};
+
+// --- Werkzeuge: Aufraeumen und Abstuerze unter einem Menuepunkt, spaeter erweiterbar ---
+const TOOL_VIEWS = ['cleanup', 'crashes'];
+
+const TOOLS = [
+  { view: 'cleanup', name: 'Speicher aufräumen', start: 'Suche starten',
+    text: 'Findet Protokolle, Absturzberichte, Zwischenspeicher und lokale Cooks in deinen Projekten und DevKits, die Unreal bei Bedarf neu erzeugt. Du wählst selbst aus, was gelöscht wird.',
+    hint: 'Die Suche löscht nichts.',
+    icon: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/>' },
+  { view: 'crashes', name: 'Abstürze', start: 'Berichte einlesen',
+    text: 'Liest die Absturzberichte deiner Projekte und DevKits, fasst gleiche Fehler zusammen und erklärt in einfachen Schritten, was du tun kannst.',
+    hint: 'Alles bleibt auf deinem PC.',
+    icon: '<path d="M12 3l9 16H3z"/><path d="M12 10v4M12 17v.5"/>' },
+];
+
+function toolTabs() {  // Kopf der einzelnen Werkzeuge: zurueck zur Uebersicht
+  return `<div class="tool-back"><button class="btn ghost small" data-view-go="tools">← ${esc(t('Alle Werkzeuge'))}</button></div>`;
+}
+
+function renderTools() {
+  $('#meta').textContent = '';
+  $('#content').innerHTML = `<div class="tools-grid">${TOOLS.map((x) => `<article class="tool-card">
+      <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true">${x.icon}</svg>
+      <h2>${esc(t(x.name))}</h2>
+      <p>${esc(t(x.text))}</p>
+      <div class="tool-foot"><span>${esc(t(x.hint))}</span><button class="btn" data-tool-start="${x.view}">${esc(t(x.start))}</button></div>
+    </article>`).join('')}</div>`;
+}
+
+function progressBox(title) {
+  return `${toolTabs()}<div class="clean-progress"><h2>${esc(t(title))}</h2>
+    <div class="track"><div class="fill js-clean-fill"></div></div>
+    <p class="clean-step js-clean-step">${esc(t('Wird vorbereitet …'))}</p></div>`;
+}
+
+// Fragt den Stand ab, solange Suche oder Loeschen laufen (die Aufrufe laufen parallel)
+async function watchCleanup(work) {
+  let running = true;
+  (async () => {
+    while (running) {
+      try { paintCleanProgress(await call('cleanup_progress')); } catch { /* naechster Versuch */ }
+      await new Promise((r) => setTimeout(r, 300));
+    }
+  })();
+  try { return await work; } finally { running = false; }
+}
+
+function paintCleanProgress(p) {
+  if (!p.phase) return;
+  // die Suche steht auf der Seite, das Loeschen im Popup
+  const box = p.phase === 'clean' ? $('#cleandlg') : $('#content');
+  const fill = box.querySelector('.js-clean-fill');
+  const step = box.querySelector('.js-clean-step');
+  if (!fill || !step) return;
+  fill.style.width = `${p.total ? Math.min(100, (p.done / p.total) * 100) : 0}%`;
+  const cat = CLEAN_CATEGORIES[p.category] ? t(CLEAN_CATEGORIES[p.category][0]) : '';
+  if (p.phase === 'scan') {
+    step.textContent = p.step === 'manifest'
+      ? t('{project}: lese Epics Dateiliste, damit nichts von Epic gelöscht wird …', { project: p.project })
+      : t('Durchsuche {project} ({n} von {m})', { project: p.project, n: Math.min(p.done + 1, p.total), m: p.total }) + (cat ? ` · ${cat}` : '');
+  } else {
+    step.textContent = t('{done} von {total} gelöscht · {files} Dateien', { done: mb(p.done / 1048576), total: mb(p.total / 1048576), files: n0(p.files) })
+      + (p.project ? ` · ${cat} – ${p.project}` : '');
+  }
+}
+
+async function renderCleanup() {
+  $('#meta').textContent = '';
+  if (!state.cleanup) {
+    $('#content').innerHTML = progressBox('Suche nach aufräumbaren Ordnern …');
+    // laeuft schon eine Suche (Tab gewechselt und zurueck), wird auf dieselbe gewartet
+    state.cleanScan ||= watchCleanup(call('cleanup_scan')).finally(() => { state.cleanScan = null; });
+    state.cleanup = await state.cleanScan;
+    if (state.view !== 'cleanup' || state.cleanRun) return;
+  }
+  const groups = new Map();
+  for (const i of state.cleanup.items) {
+    if (!groups.has(i.dir)) groups.set(i.dir, { name: i.project, dir: i.dir, items: [] });
+    groups.get(i.dir).items.push(i);
+  }
+  const sum = (g) => g.items.reduce((n, i) => n + i.mb, 0); // groesste Einsparung zuerst
+  const row = (i) => {
+    const [name, help] = CLEAN_CATEGORIES[i.category];
+    return `<label class="clean-row"><input type="checkbox" data-clean="${esc(i.id)}" data-mb="${Number(i.mb)}">
+      <span class="clean-text"><span class="clean-name">${esc(t(name))}</span><span class="clean-help">${esc(t(help))}</span></span>
+      <span class="clean-size">${esc(mb(i.mb))}</span></label>`;
+  };
+  $('#content').innerHTML = `${toolTabs()}<div class="cleanup">
+    <p class="note">${esc(t('Hier stehen nur Ordner, die Unreal neu erzeugt oder die reine Protokolle sind. Deine Arbeit, Autosaves und Einstellungen sind nicht dabei, und Dateien von Epic werden nie gelöscht. Das Löschen ist endgültig und geschieht auf eigene Gefahr.'))}</p>
+    ${state.cleanup.editorRunning ? `<p class="note bad">${esc(t('Bitte zuerst den Unreal Editor schließen.'))}</p>` : ''}
+    ${groups.size ? [...groups.values()].sort((a, b) => sum(b) - sum(a)).map((g) => `<section class="clean-group"><div class="home-head"><h2 title="${esc(g.dir)}">${esc(g.name)}</h2><span class="clean-dir">${esc(g.dir)}</span></div>${g.items.map(row).join('')}</section>`).join('')
+    : `<p class="empty">${esc(t('Nichts zum Aufräumen gefunden.'))}</p>`}
+    ${groups.size ? `<div class="clean-bar"><span id="clean-total"></span><button class="btn danger" id="clean-go" data-clean-go="1" disabled>${esc(t('Auswahl löschen'))}</button></div>` : ''}
+  </div>`;
+  updateCleanBar();
+}
+
+function updateCleanBar() {
+  const picked = [...document.querySelectorAll('[data-clean]:checked')];
+  const total = picked.reduce((sum, c) => sum + Number(c.dataset.mb), 0);
+  const label = $('#clean-total');
+  if (!label) return;
+  label.textContent = t('Ausgewählt: {size}', { size: mb(total) });
+  $('#clean-go').disabled = !picked.length || !!state.cleanup?.editorRunning;
+}
+
+async function runCleanup() {
+  const picked = [...document.querySelectorAll('[data-clean]:checked')];
+  const total = picked.reduce((sum, c) => sum + Number(c.dataset.mb), 0);
+  if (!(await askConfirm(t('{size} endgültig löschen?\n\nDie Dateien kommen nicht in den Papierkorb. Das Löschen geschieht auf eigene Gefahr.', { size: mb(total) }), { ok: 'Endgültig löschen', danger: true }))) return;
+  // Loeschen im Popup: laesst sich nicht wegklicken, solange es laeuft
+  const dlg = $('#cleandlg');
+  const ok = $('#cleandlg-ok');
+  const fill = dlg.querySelector('.js-clean-fill');
+  const step = dlg.querySelector('.js-clean-step');
+  $('#cleandlg-title').textContent = t('Wird gelöscht …');
+  fill.style.width = '0%';
+  step.textContent = t('Wird vorbereitet …');
+  ok.hidden = true;
+  dlg.hidden = false;
+  state.cleanRun = true;
+  try {
+    const res = await watchCleanup(call('cleanup_run', picked.map((c) => c.dataset.clean)));
+    $('#cleandlg-title').textContent = t('Aufräumen fertig');
+    fill.style.width = '100%';
+    step.textContent = t(res.skipped ? '{size} freigegeben, {n} Dateien waren in Benutzung.' : '{size} freigegeben.', { size: mb(res.freedMb), n: res.skipped });
+  } catch (err) {
+    $('#cleandlg-title').textContent = t('Löschen nicht möglich');
+    step.textContent = err.message;
+  } finally {
+    state.cleanRun = false;
+  }
+  ok.hidden = false;
+  ok.focus();
+  ok.onclick = () => { dlg.hidden = true; };
+  state.cleanup = null; // Uebersicht hinter dem Popup gleich neu einlesen
+  if (state.view === 'cleanup') render();
+}
+
 async function show(view, refresh = false) {
   const panel = (x) => x === 'store' || x === 'account'; // eigenes Browser-Element ueber dem Inhalt
   if (panel(state.view) && state.view !== view) call('store_hide', state.view);
   state.view = view;
   document.body.classList.toggle('store-mode', panel(view));
   document.body.classList.toggle('home-mode', view === 'home');
-  document.querySelectorAll('.nav').forEach((b) => b.classList.toggle('active', b.dataset.view === view));
+  document.querySelectorAll('.nav').forEach((b) => b.classList.toggle('active', b.dataset.view === view
+    || (b.dataset.view === 'tools' && TOOL_VIEWS.includes(view))));
   $('#acc-open').classList.toggle('active', view === 'account');
   $('#view-title').textContent = t(TITLES[view]);
   try {
     if (refresh) {
-      $('#content').innerHTML = `<p class="loading">${esc(t(view === 'projects' ? 'Suche Projekte …' : view === 'fab' && state.fabTab === 'local' ? 'Lese lokale Assets …' : 'Lade von Epic … das kann beim ersten Mal eine Minute dauern.'))}</p>`;
+      $('#content').innerHTML = `<p class="loading">${esc(t(view === 'crashes' ? 'Lese Absturzberichte …' : view === 'cleanup' ? 'Suche nach aufräumbaren Ordnern …' : view === 'projects' ? 'Suche Projekte …' : view === 'fab' && state.fabTab === 'local' ? 'Lese lokale Assets …' : 'Lade von Epic … das kann beim ersten Mal eine Minute dauern.'))}</p>`;
       if (view === 'fab' && state.fabTab === 'local') state.local = null; // nur neu nachmessen, kein Epic-Abruf
+      else if (view === 'cleanup') state.cleanup = null;
+      else if (view === 'crashes') state.crashes = null;
       else if (view === 'fab') await loadFab(true);
       else if (view === 'projects') await loadProjects(true);
       else await loadLibrary(true);
@@ -1383,6 +1793,7 @@ async function saveSetting(changes) {
   if (state.view === 'settings') show('settings');
 }
 
+$('#content').addEventListener('change', (e) => { if (e.target.closest('[data-clean]')) updateCleanBar(); });
 $('#content').addEventListener('change', async (e) => {
   const el = e.target.closest('[data-setting]');
   if (!el) return;
@@ -1468,12 +1879,20 @@ $('#content').addEventListener('click', async (e) => {
     else if (b.dataset.chooseDir) { await call('choose_install_dir'); render(); }
     else if (b.dataset.viewGo) show(b.dataset.viewGo);
     else if (b.dataset.addKind) await openAdd(b.dataset.addKind);
+    else if (b.dataset.adoptKind) await openAdopt(b.dataset.adoptKind);
+    else if (b.dataset.cleanGo) await runCleanup();
     else if (b.dataset.openProject) { await call('open_project', b.dataset.openProject); toast(t('Unreal Editor wird gestartet …')); }
     else if (b.dataset.projectAssets) {
       state.fabProject = state.projects.items.find((p) => p.uproject === b.dataset.projectAssets) || null;
       show('fab');
     }
     else if (b.dataset.deleteProject) await openDelete(b.dataset.deleteProject);
+    else if (b.dataset.askAi) openAskAi(state.crashShown?.[Number(b.dataset.askAi)]);
+    else if (b.dataset.toolStart) {  // frisch starten, kein altes Ergebnis zeigen
+      if (b.dataset.toolStart === 'cleanup' && !state.cleanScan) state.cleanup = null;
+      if (b.dataset.toolStart === 'crashes') state.crashes = null;
+      show(b.dataset.toolStart);
+    }
     else if (b.dataset.fabTab) { state.fabTab = b.dataset.fabTab; await render(); $('main').scrollTop = 0; }
     else if (b.dataset.delLocal) await deleteLocal(b.dataset.delLocal);
     else if (b.dataset.renameProject) {

@@ -57,7 +57,7 @@ RE_PRUNED = re.compile(r"^PRUNED (\d+) (\d+)")
 RE_SERVER = re.compile(r"\b[a-z][a-z0-9+.-]*://\S+|\b(?:[a-z0-9-]+\.)+(?:com|net|org|io|cloud|gg)\b(?:[/:]\S*)?", re.I)
 
 ACTION_LABEL = {"install": "Installieren", "update": "Update", "uninstall": "Deinstallieren", "repair": "Reparieren",
-                "fab": "Fab-Asset", "modify": "Komponenten ändern"}
+                "fab": "Fab-Asset", "modify": "Komponenten ändern", "adopt": "Übernehmen"}
 
 
 class Downloads:
@@ -250,6 +250,8 @@ class Downloads:
             return self._run_fab(job)
         if job["action"] == "modify":
             return self._run_modify(job)
+        if job["action"] == "adopt":
+            return self._run_adopt(job)
         app = job["appName"]
         if job["fromEgl"]:
             job["message"] = "Übernehme Installation aus dem Epic Launcher …"
@@ -292,7 +294,7 @@ class Downloads:
                 job["message"] = ("Fertig – {bad} von {n} Dateien waren defekt oder fehlten und wurden neu geladen."
                                   if bad else "Fertig – alle {n} Dateien sind in Ordnung.")
                 job["msgVars"] = {"bad": bad, "n": job["verifyTotal"]}
-            elif not job["message"].startswith("Bereits"):
+            elif not job["message"].startswith(("Bereits", "Fertig – Versionsstand")):
                 job["message"] = "Fertig."
         else:
             problems = [line for line in job["log"] if RE_PROBLEM.search(line)]
@@ -343,6 +345,25 @@ class Downloads:
             ("download", False): "Fertig: {copied} Dateien kopiert.",
         }[(source, bool(skipped))]
         job["msgVars"] = {"copied": copied, "skipped": skipped}
+
+    def _run_adopt(self, job):
+        """Vorhandene Installation uebernehmen. Ohne Epics Verwaltungsdaten (z. B. aus Heroic)
+        ist der Stand unbekannt: dann alle Dateien pruefen, Fehlendes und Veraltetes nachladen."""
+        job.pop("adoptResult", None)
+        job["message"] = "Ordner wird geprüft …"
+        ok = self._exec(job, BRIDGE + ["adopt", job["appName"], job["basePath"]])
+        if self._stopped(job):
+            return
+        if not ok:
+            if job.get("adoptResult") == "wrong":
+                job["msgVars"] = {"title": job["title"]}
+                return self._fail(job, "Dieser Ordner passt nicht zu {title}. Bitte den Hauptordner der Installation wählen.")
+            problems = [line for line in job["log"] if RE_PROBLEM.search(line)]
+            return self._fail(job, problems[-1] if problems else "Übernahme fehlgeschlagen.")
+        if job.get("adoptResult") == "verify":
+            job["action"] = "repair"
+            return self._run(job)
+        job["status"], job["progress"], job["message"] = "done", 100.0, "Fertig – Installation übernommen."
 
     def _run_modify(self, job):
         """Komponenten aendern: Auswahl setzen, Neues laden, Abgewaehltes gezielt loeschen.
@@ -435,7 +456,9 @@ class Downloads:
                 job["verified"] = True
             return
         job["log"] = (log + [shown])[-200:]
-        if RE_VERIFY_BAD.search(line):
+        if line.startswith("ADOPT_"):
+            job["adoptResult"] = {"ADOPT_WRONG_FOLDER": "wrong", "ADOPT_NEEDS_VERIFY": "verify"}.get(line.strip(), "ok")
+        elif RE_VERIFY_BAD.search(line):
             job["verifyBad"] = (job.get("verifyBad") or 0) + 1
         elif "Verification finished successfully" in line:
             job["verified"] = True
@@ -473,7 +496,8 @@ class Downloads:
         elif m := RE_INSTALL_PATH.search(line):
             job["installPath"] = m.group(1).strip()
         elif RE_UP_TO_DATE.search(line):
-            job["message"] = "Bereits aktuell – nichts zu tun."
+            job["message"] = ("Fertig – Versionsstand aktualisiert, es musste nichts geladen werden."
+                              if job["action"] == "update" else "Bereits aktuell – nichts zu tun.")
         elif "Waiting for installation to finish" in line:
             job["message"] = "Schließe Installation ab …"
 

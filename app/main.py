@@ -15,7 +15,7 @@ import webbrowser
 import requests
 import webview
 
-from backend import autostart, components, freefab, launch, projects, selfupdate, settings
+from backend import autostart, cleanup, components, crashes, freefab, launch, projects, selfupdate, settings
 from backend.tray import Tray
 from backend.downloads import Downloads, hide_servers
 from backend.epic import DATA_DIR, LOGIN_URL, EpicService
@@ -23,13 +23,13 @@ from backend.storepanel import StorePanel, guard_main
 from backend.fab_install import KINDS, compatibility, read_project
 from backend.fab_install import plan as fab_plan
 from backend.i18n import set_lang, tr
-from backend.preview import update_preview
+from backend.preview import _installed_manifest, update_preview
 from backend import vault
 from backend.vault import asset_updates, epic_cached, epic_vault_dirs
 
 # im fertigen Paket liegen ui/ usw. im Entpack-Ordner von PyInstaller
 HERE = getattr(sys, "_MEIPASS", None) or os.path.dirname(os.path.abspath(__file__))
-APP_VERSION = "1.0.2"
+APP_VERSION = "1.0.3"
 
 # Sprache fest in der Adresse: Fab ignoriert die Browsersprache und entscheidet sonst
 # selbst (bei Mike kam so eine fremde Sprache heraus); Fab: ?lang=de, Epic: /de/ bzw. /en-US/
@@ -478,6 +478,88 @@ class Api:
             return {"needsInstallDir": True}
         return self._downloads.add("install", app_name, item["title"], base_path=base)
 
+    def _all_projects(self):
+        """Eigene Projekte plus die Projekte in Engines und DevKits (z. B. Projects/ShooterGame)."""
+        projs = list(self.projects()["items"])
+        for e in self._engines():
+            projs += [{**p, "displayName": f"{e['title']} · {p['name']}"} for p in cleanup.kit_projects(e["path"])]
+        return projs
+
+    @_safe
+    def crash_reports(self):
+        return crashes.scan(self._all_projects())
+
+    def _private_names(self):
+        """Namen, die nicht an eine KI gehen: Windows-Konto, Rechnername, Epic-Anzeigename."""
+        names = [os.environ.get("USERNAME"), os.environ.get("COMPUTERNAME")]
+        try:
+            names.append(self._epic.account().get("name"))
+        except Exception:
+            pass
+        return [n for n in names if n]
+
+    @_safe
+    def ai_prompt(self, text):
+        return {"text": crashes.scrub(str(text or ""), self._private_names())}
+
+    @_safe
+    def ask_ai(self, provider, text):
+        """Oeffnet den gewaehlten KI-Dienst im Browser mit der Frage - nur feste Adressen, Text erneut bereinigt."""
+        url = crashes.ai_url(provider, crashes.scrub(str(text or ""), self._private_names()))
+        if not url:
+            return {"error": tr("Unbekannter Anbieter.")}
+        webbrowser.open(url)
+        return {"ok": True}
+
+    # --- Speicher aufraeumen ---------------------------------------------------
+    @_safe
+    def cleanup_scan(self):
+        projs = self._all_projects()
+        installed = self._epic.installed()
+        installs = {app: v["path"] for app, v in installed.items()}
+
+        def load(app):
+            try:
+                return _installed_manifest(self._epic, app, installed[app])
+            except Exception:  # ohne Dateiliste wird das Projekt nicht angeboten
+                traceback.print_exc()
+                return None
+        kits = [{"dir": e["path"], "name": e["title"], "displayName": e["title"]} for e in self._engines()]
+        return cleanup.scan(projs, installs, load, kits)
+
+    def cleanup_progress(self):
+        return dict(cleanup.progress)
+
+    @_safe
+    def cleanup_run(self, ids):
+        res = cleanup.clean(list(ids or []))
+        return {"error": tr("Bitte zuerst den Unreal Editor schließen.")} if res.get("blocked") else res
+
+    @_safe
+    def adopt_options(self):
+        return {"heroic": self._epic.heroic_installed()}
+
+    @_safe
+    def adopt_install(self, app_name, path):
+        """Vorhandenen Ordner (z. B. aus Heroic oder einem anderen PC) als Installation uebernehmen."""
+        item = self._epic.find(app_name)
+        if not item or item["kind"] not in ("engine", "tool", "game"):
+            return {"error": tr("Eintrag nicht in der Bibliothek gefunden.")}
+        installed = self._epic.installed()
+        if app_name in installed:
+            return {"error": tr("Diese Installation ist schon im Launcher.")}
+        folder = os.path.abspath(path or "")
+        if not path or path.startswith(("\\\\", "//")) or not os.path.isdir(folder):
+            return {"error": tr("Ordner existiert nicht oder ist ein Netzwerkpfad.")}
+        if os.path.dirname(folder) == folder:
+            return {"error": tr("Bitte den Hauptordner der Installation wählen, nicht das ganze Laufwerk.")}
+        key = os.path.normcase(folder)
+        users = [app for app, local in installed.items() if os.path.normcase(os.path.abspath(local["path"])) == key]
+        if users:  # Plugins teilen sich den Ordner der Engine - den lesbaren Namen nennen
+            names = [i["title"] for i in map(self._epic.find, users) if i]
+            return {"error": tr("Dieser Ordner gehört schon zu {title}.", title=names[0] if names else users[0])}
+        return self._downloads.add("adopt", app_name, item["title"], base_path=folder)
+
     @_safe
     def update(self, app_name):
         return self._queue_existing("update", app_name)
@@ -790,6 +872,9 @@ def main(selftest=None):
     # Eigener Profilordner, getrennt von Edge; liegt in %LOCALAPPDATA%\SiccoraLauncher\webview.
     # Ohne privaten Modus nimmt pywebview sonst immer Port 42001 fuer die Oberflaeche -
     # eine zweite Instanz (oder ein Test) wuerde dann die Oberflaeche der ersten laden.
+    # Popups im selben Fenster oeffnen: Epics Anmeldung ueber Steam & Co. nutzt ein Popup. Im
+    # System-Browser landete der Anmeldecode sonst dort, und der Launcher bekam ihn nie.
+    webview.settings["OPEN_EXTERNAL_LINKS_IN_BROWSER"] = False
     try:
         webview.start(on_started, gui="edgechromium", debug=bool(os.environ.get("SICCORA_DEBUG")),
                       private_mode=False, storage_path=os.path.join(DATA_DIR, "webview"), http_port=free_port())

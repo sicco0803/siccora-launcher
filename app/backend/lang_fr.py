@@ -109,5 +109,15 @@ TEXTS = {
     "Kein passendes Setup im Release gefunden.": "Aucun programme d’installation adapté dans la version.",
     "Unerwartete Download-Adresse.": "Adresse de téléchargement inattendue.",
     "Prüfsumme des Updates stimmt nicht – Download verworfen.": "La somme de contrôle de la mise à jour ne correspond pas – téléchargement rejeté.",
-    "Das Update ist nicht vom selben Herausgeber signiert – verworfen.": "La mise à jour n’est pas signée par le même éditeur – rejetée."
+    "Das Update ist nicht vom selben Herausgeber signiert – verworfen.": "La mise à jour n’est pas signée par le même éditeur – rejetée.",
+    "Übernehmen": "Reprise",
+    "Ordner wird geprüft …": "Vérification du dossier …",
+    "Fertig – Installation übernommen.": "Terminé – installation ajoutée.",
+    "Übernahme fehlgeschlagen.": "L’ajout de l’installation a échoué.",
+    "Dieser Ordner passt nicht zu {title}. Bitte den Hauptordner der Installation wählen.": "Ce dossier ne correspond pas à {title}. Veuillez choisir le dossier principal de l’installation.",
+    "Diese Installation ist schon im Launcher.": "Cette installation est déjà dans le launcher.",
+    "Bitte den Hauptordner der Installation wählen, nicht das ganze Laufwerk.": "Veuillez choisir le dossier principal de l’installation, pas tout le lecteur.",
+    "Dieser Ordner gehört schon zu {title}.": "Ce dossier appartient déjà à {title}.",
+    "Fertig – Versionsstand aktualisiert, es musste nichts geladen werden.": "Terminé – version mise à jour, rien à télécharger.",
+    "Bitte zuerst den Unreal Editor schließen.": "Veuillez d’abord fermer l’Unreal Editor."
 }

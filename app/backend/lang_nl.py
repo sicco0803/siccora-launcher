@@ -109,5 +109,15 @@ TEXTS = {
     "Kein passendes Setup im Release gefunden.": "Geen passende installer gevonden in de release.",
     "Unerwartete Download-Adresse.": "Onverwacht downloadadres.",
     "Prüfsumme des Updates stimmt nicht – Download verworfen.": "De controlesom van de update klopt niet – download verworpen.",
-    "Das Update ist nicht vom selben Herausgeber signiert – verworfen.": "De update is niet door dezelfde uitgever ondertekend – verworpen."
+    "Das Update ist nicht vom selben Herausgeber signiert – verworfen.": "De update is niet door dezelfde uitgever ondertekend – verworpen.",
+    "Übernehmen": "Overnemen",
+    "Ordner wird geprüft …": "Map controleren …",
+    "Fertig – Installation übernommen.": "Klaar – installatie toegevoegd.",
+    "Übernahme fehlgeschlagen.": "Toevoegen van de installatie is mislukt.",
+    "Dieser Ordner passt nicht zu {title}. Bitte den Hauptordner der Installation wählen.": "Deze map past niet bij {title}. Kies de hoofdmap van de installatie.",
+    "Diese Installation ist schon im Launcher.": "Deze installatie staat al in de launcher.",
+    "Bitte den Hauptordner der Installation wählen, nicht das ganze Laufwerk.": "Kies de hoofdmap van de installatie, niet de hele schijf.",
+    "Dieser Ordner gehört schon zu {title}.": "Deze map hoort al bij {title}.",
+    "Fertig – Versionsstand aktualisiert, es musste nichts geladen werden.": "Klaar – versie bijgewerkt, er hoefde niets gedownload te worden.",
+    "Bitte zuerst den Unreal Editor schließen.": "Sluit eerst de Unreal Editor."
 }

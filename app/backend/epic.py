@@ -144,6 +144,17 @@ class EpicService:
             result[app] = {"path": ig["install_path"], "version": ig["version"], "source": "legendary"}
         return result
 
+    def heroic_installed(self):
+        """Was Heroic installiert hat (appName -> Ordner): Vorschlaege fuer "Vorhandene hinzufuegen"."""
+        path = os.path.join(os.environ.get("APPDATA", ""), "heroic", "legendaryConfig", "legendary", "installed.json")
+        try:
+            with open(path, encoding="utf-8") as f:
+                data = json.load(f)
+        except (OSError, ValueError):
+            return {}
+        return {app: ig["install_path"] for app, ig in data.items()
+                if isinstance(ig, dict) and os.path.isdir(ig.get("install_path") or "")}
+
     # --- Bibliothek: Spiele, Engines, Tools ----------------------------------
     def _catalog(self, wanted):
         """Katalog-Infos je catalogItemId, dauerhaft gecacht. wanted: {ns: [ids]}."""

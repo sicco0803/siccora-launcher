@@ -109,5 +109,15 @@ TEXTS = {
     "Kein passendes Setup im Release gefunden.": "Nessun programma di installazione adatto nella release.",
     "Unerwartete Download-Adresse.": "Indirizzo di download inatteso.",
     "Prüfsumme des Updates stimmt nicht – Download verworfen.": "Il checksum dell’aggiornamento non corrisponde – download scartato.",
-    "Das Update ist nicht vom selben Herausgeber signiert – verworfen.": "L’aggiornamento non è firmato dallo stesso editore – scartato."
+    "Das Update ist nicht vom selben Herausgeber signiert – verworfen.": "L’aggiornamento non è firmato dallo stesso editore – scartato.",
+    "Übernehmen": "Aggiunta esistente",
+    "Ordner wird geprüft …": "Controllo della cartella …",
+    "Fertig – Installation übernommen.": "Fatto – installazione aggiunta.",
+    "Übernahme fehlgeschlagen.": "Aggiunta dell’installazione non riuscita.",
+    "Dieser Ordner passt nicht zu {title}. Bitte den Hauptordner der Installation wählen.": "Questa cartella non corrisponde a {title}. Scegli la cartella principale dell’installazione.",
+    "Diese Installation ist schon im Launcher.": "Questa installazione è già nel launcher.",
+    "Bitte den Hauptordner der Installation wählen, nicht das ganze Laufwerk.": "Scegli la cartella principale dell’installazione, non l’intera unità.",
+    "Dieser Ordner gehört schon zu {title}.": "Questa cartella appartiene già a {title}.",
+    "Fertig – Versionsstand aktualisiert, es musste nichts geladen werden.": "Fatto – versione aggiornata, non è stato necessario scaricare nulla.",
+    "Bitte zuerst den Unreal Editor schließen.": "Chiudi prima Unreal Editor."
 }

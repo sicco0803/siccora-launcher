@@ -109,5 +109,15 @@ TEXTS = {
     "Kein passendes Setup im Release gefunden.": "Nenhum instalador adequado encontrado na versão.",
     "Unerwartete Download-Adresse.": "Endereço de transferência inesperado.",
     "Prüfsumme des Updates stimmt nicht – Download verworfen.": "A soma de verificação da atualização não corresponde – transferência descartada.",
-    "Das Update ist nicht vom selben Herausgeber signiert – verworfen.": "A atualização não está assinada pelo mesmo editor – descartada."
+    "Das Update ist nicht vom selben Herausgeber signiert – verworfen.": "A atualização não está assinada pelo mesmo editor – descartada.",
+    "Übernehmen": "Adicionar existente",
+    "Ordner wird geprüft …": "A verificar a pasta …",
+    "Fertig – Installation übernommen.": "Concluído – instalação adicionada.",
+    "Übernahme fehlgeschlagen.": "Não foi possível adicionar a instalação.",
+    "Dieser Ordner passt nicht zu {title}. Bitte den Hauptordner der Installation wählen.": "Esta pasta não corresponde a {title}. Escolhe a pasta principal da instalação.",
+    "Diese Installation ist schon im Launcher.": "Esta instalação já está no launcher.",
+    "Bitte den Hauptordner der Installation wählen, nicht das ganze Laufwerk.": "Escolhe a pasta principal da instalação, não a unidade inteira.",
+    "Dieser Ordner gehört schon zu {title}.": "Esta pasta já pertence a {title}.",
+    "Fertig – Versionsstand aktualisiert, es musste nichts geladen werden.": "Concluído – versão atualizada, não foi preciso transferir nada.",
+    "Bitte zuerst den Unreal Editor schließen.": "Fecha primeiro o Unreal Editor."
 }
