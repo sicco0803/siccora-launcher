@@ -621,6 +621,7 @@ const I18N = {
     'Vorhandenes Spiel hinzufügen': 'Add existing game',
     'Spiel aus deiner Epic-Bibliothek': 'Game from your Epic library',
     'Noch kein Spiel installiert.': 'No game installed yet.',
+    'Bereits aktuell. Epic führt für diesen Eintrag intern eine abweichende Versionsnummer – der Update-Hinweis wird ausgeblendet, bis eine wirklich neue Version erscheint.': 'Already up to date. Epic uses a different internal version number for this entry – the update notice is hidden until a really new version appears.',
   },
 };
 

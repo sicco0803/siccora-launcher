@@ -207,8 +207,10 @@ class EpicService:
             known = {i["appName"] for i in data["items"]}
             others = _other_apps(assets)
             seen = data.get("seenApps")
-            is_new = any(_is_engine(a) and a["appName"] not in known for a in assets) \
-                or (seen is not None and bool(others - set(seen)))
+            current = {a["appName"] for a in assets if _is_engine(a)}
+            # neu hinzugekommen ODER bei Epic weggefallen (z. B. zurueckgezogen) -> Liste neu aufbauen
+            is_new = bool(current - known) or any(i["kind"] == "engine" and i["appName"] not in current for i in data["items"]) \
+                or (seen is not None and (bool(others - set(seen)) or bool(set(seen) - others)))
             refreshed = None
             if is_new:
                 try:
@@ -262,17 +264,16 @@ class EpicService:
         with self._lock:
             self.core.login()
             assets = self.core.egs.get_game_assets(platform="Windows")
-            records = self.core.egs.get_library_items()
 
-        latest = {a["appName"]: a for a in assets}
+        # Katalog-Infos direkt zu jedem Download holen (die Asset-Liste ist genau das, was das Konto
+        # besitzt) - nicht ueber die separate Bibliotheksliste, deren Eintraege nicht immer passen
         wanted = {}
-        for rec in records:
-            if rec.get("namespace") in (UE_NS, MEGASCANS_NS) or rec.get("appName") not in latest:
-                continue
-            wanted.setdefault(rec["namespace"], []).append(rec["catalogItemId"])
-        catalog = self._catalog(wanted)
+        for a in assets:
+            if a["namespace"] not in (UE_NS, MEGASCANS_NS):
+                wanted.setdefault(a["namespace"], set()).add(a["catalogItemId"])
+        catalog = self._catalog({ns: sorted(ids) for ns, ids in wanted.items()})
 
-        items = []
+        items, pending = [], set()
         for a in assets:
             ns, name = a["namespace"], a["appName"]
             if ns == UE_NS:
@@ -286,6 +287,7 @@ class EpicService:
                 continue
             info = catalog.get(a["catalogItemId"])
             if not info:
+                pending.add(name)  # Epic gerade nicht erreichbar/zu viele Anfragen: beim naechsten Abgleich erneut
                 continue
             cats = set(info["categories"])
             title = info["title"] or name
@@ -305,19 +307,31 @@ class EpicService:
         with self._lock:
             self._mark_previews(items)
         now = time.time()
-        data = {"updated": now, "checked": now, "items": items, "seenApps": sorted(_other_apps(assets))}
+        # noch nicht eingeordnete Eintraege gelten nicht als gesehen - so holt der naechste Abgleich sie nach
+        data = {"updated": now, "checked": now, "items": items, "seenApps": sorted(_other_apps(assets) - pending)}
         _save("library.json", data)
         return data
 
+    def ack_version(self, app_name, latest):
+        """Epics Asset-Liste nennt fuer manche Eintraege eine andere Nummer als das Manifest
+        (z. B. Conan Exiles Enhanced Dev Kit). Hat die Vorschau bestaetigt, dass die installierte
+        Version schon dem aktuellen Manifest entspricht, gilt diese Nummer als erledigt - bis
+        Epic eine neue meldet."""
+        acks = _load("version_ack.json", {})
+        acks[app_name] = latest
+        _save("version_ack.json", acks)
+
     def _with_install_state(self, data):
         inst = self.installed()
+        acks = _load("version_ack.json", {})
         for item in data["items"]:
             local = inst.get(item["appName"])
             item["installed"] = bool(local)
             item["source"] = local["source"] if local else None
             item["path"] = local["path"] if local else None
             item["version"] = local["version"] if local else None
-            item["updateAvailable"] = bool(local and item.get("latest") and local["version"] != item["latest"])
+            item["updateAvailable"] = bool(local and item.get("latest") and local["version"] != item["latest"]
+                                           and acks.get(item["appName"]) != item["latest"])
             if item["kind"] == "engine" and local:
                 item["plugins"] = sorted(n.split("_")[0] for n, v in inst.items()
                                          if v["path"] == local["path"] and n != item["appName"])

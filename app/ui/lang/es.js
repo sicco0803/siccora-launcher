@@ -607,5 +607,6 @@ I18N.es = {
   "Fehlermeldung": "Mensaje de error",
   "Vorhandenes Spiel hinzufügen": "Añadir juego existente",
   "Spiel aus deiner Epic-Bibliothek": "Juego de tu biblioteca de Epic",
-  "Noch kein Spiel installiert.": "Aún no hay ningún juego instalado."
+  "Noch kein Spiel installiert.": "Aún no hay ningún juego instalado.",
+  "Bereits aktuell. Epic führt für diesen Eintrag intern eine abweichende Versionsnummer – der Update-Hinweis wird ausgeblendet, bis eine wirklich neue Version erscheint.": "Ya está actualizado. Epic usa internamente otro número de versión para esta entrada; el aviso de actualización se oculta hasta que aparezca una versión realmente nueva."
 };

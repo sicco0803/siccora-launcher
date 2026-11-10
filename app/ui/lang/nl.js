@@ -607,5 +607,6 @@ I18N.nl = {
   "Fehlermeldung": "Foutmelding",
   "Vorhandenes Spiel hinzufügen": "Bestaande game toevoegen",
   "Spiel aus deiner Epic-Bibliothek": "Game uit je Epic-bibliotheek",
-  "Noch kein Spiel installiert.": "Nog geen game geïnstalleerd."
+  "Noch kein Spiel installiert.": "Nog geen game geïnstalleerd.",
+  "Bereits aktuell. Epic führt für diesen Eintrag intern eine abweichende Versionsnummer – der Update-Hinweis wird ausgeblendet, bis eine wirklich neue Version erscheint.": "Al up-to-date. Epic gebruikt intern een ander versienummer voor dit item – de updatemelding wordt verborgen tot er echt een nieuwe versie verschijnt."
 };

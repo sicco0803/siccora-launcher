@@ -607,5 +607,6 @@ I18N.fr = {
   "Fehlermeldung": "Message d'erreur",
   "Vorhandenes Spiel hinzufügen": "Ajouter un jeu existant",
   "Spiel aus deiner Epic-Bibliothek": "Jeu de ta bibliothèque Epic",
-  "Noch kein Spiel installiert.": "Aucun jeu installé pour l'instant."
+  "Noch kein Spiel installiert.": "Aucun jeu installé pour l'instant.",
+  "Bereits aktuell. Epic führt für diesen Eintrag intern eine abweichende Versionsnummer – der Update-Hinweis wird ausgeblendet, bis eine wirklich neue Version erscheint.": "Déjà à jour. Epic utilise en interne un autre numéro de version pour cette entrée – l’avis de mise à jour est masqué jusqu’à ce qu’une version vraiment nouvelle paraisse."
 };

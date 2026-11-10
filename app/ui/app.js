@@ -667,10 +667,15 @@ async function openPreview(appName) {
       <dt>${esc(t('Dateien'))}</dt><dd>${esc(t('{c} geändert · {a} neu · {r} entfällt', { c: p.changed, a: p.added, r: p.removed }))}</dd>
       <dt>${esc(t('Platz frei'))}</dt><dd>${mb(p.freeMb)}${p.enoughSpace ? '' : esc(t(' – zu wenig!'))}</dd>`}
     </dl>
-    ${p.upToDate ? `<p class="note">${esc(t(onlyVersion ? 'Es haben sich keine Dateien geändert, nur die Versionsnummer. Es wird nichts heruntergeladen, nur der Stand wird aktualisiert.' : 'Bereits aktuell – nichts zu tun.'))}</p>` : removed}
+    ${p.upToDate ? `<p class="note">${esc(t(p.acknowledged ? 'Bereits aktuell. Epic führt für diesen Eintrag intern eine abweichende Versionsnummer – der Update-Hinweis wird ausgeblendet, bis eine wirklich neue Version erscheint.' : onlyVersion ? 'Es haben sich keine Dateien geändert, nur die Versionsnummer. Es wird nichts heruntergeladen, nur der Stand wird aktualisiert.' : 'Bereits aktuell – nichts zu tun.'))}</p>` : removed}
     ${!p.upToDate && p.source === 'egl' ? `<p class="note">${esc(t('Wurde mit dem Epic Launcher installiert. Er bekommt den neuen Stand danach automatisch mitgeteilt.'))}</p>` : ''}`;
   // Neue Versionsnummer ohne geaenderte Dateien: das Update muss trotzdem laufen, sonst bleibt die Meldung stehen
   $('#preview-start').hidden = p.upToDate ? !onlyVersion : !p.enoughSpace;
+  if (p.acknowledged) {  // Hinweis sofort aus Liste und Uebersicht nehmen
+    const lib = state.library?.items.find((i) => i.appName === appName);
+    if (lib) lib.updateAvailable = false;
+    if (['games', 'unreal', 'home'].includes(state.view)) render();
+  }
   $('#preview-start').onclick = async () => {
     $('#preview').hidden = true;
     await call('update', appName);

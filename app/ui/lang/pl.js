@@ -607,5 +607,6 @@ I18N.pl = {
   "Fehlermeldung": "Komunikat błędu",
   "Vorhandenes Spiel hinzufügen": "Dodaj istniejącą grę",
   "Spiel aus deiner Epic-Bibliothek": "Gra z twojej biblioteki Epic",
-  "Noch kein Spiel installiert.": "Nie zainstalowano jeszcze żadnej gry."
+  "Noch kein Spiel installiert.": "Nie zainstalowano jeszcze żadnej gry.",
+  "Bereits aktuell. Epic führt für diesen Eintrag intern eine abweichende Versionsnummer – der Update-Hinweis wird ausgeblendet, bis eine wirklich neue Version erscheint.": "Już aktualne. Epic używa wewnętrznie innego numeru wersji dla tej pozycji – informacja o aktualizacji jest ukryta, dopóki nie pojawi się naprawdę nowa wersja."
 };

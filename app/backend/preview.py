@@ -99,14 +99,23 @@ def update_preview(service, app_name):
     new_size = sum(fm.file_size for fm in new_files.values())
     free = shutil.disk_usage(root).free
 
+    up_to_date = not (changed or added or removed)
+    # Gleiche Dateien und gleiche Manifest-Version, nur Epics Asset-Liste nennt eine andere Nummer:
+    # nichts zu tun - merken, damit der Update-Hinweis verschwindet
+    acknowledged = bool(up_to_date and old.meta.build_version == new.meta.build_version
+                        and item.get("latest") and item["latest"] != local["version"])
+    if acknowledged:
+        service.ack_version(app_name, item["latest"])
+
     return {
         "appName": app_name,
+        "acknowledged": acknowledged,
         "title": item["title"],
         "path": root,
         "source": local["source"],
         "oldVersion": old.meta.build_version,
         "newVersion": new.meta.build_version,
-        "upToDate": not (changed or added or removed),
+        "upToDate": up_to_date,
         "components": tags,
         "changed": len(changed),
         "added": len(added),

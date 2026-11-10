@@ -607,5 +607,6 @@ I18N.it = {
   "Fehlermeldung": "Messaggio di errore",
   "Vorhandenes Spiel hinzufügen": "Aggiungi gioco esistente",
   "Spiel aus deiner Epic-Bibliothek": "Gioco dalla tua libreria Epic",
-  "Noch kein Spiel installiert.": "Nessun gioco ancora installato."
+  "Noch kein Spiel installiert.": "Nessun gioco ancora installato.",
+  "Bereits aktuell. Epic führt für diesen Eintrag intern eine abweichende Versionsnummer – der Update-Hinweis wird ausgeblendet, bis eine wirklich neue Version erscheint.": "Già aggiornato. Epic usa internamente un altro numero di versione per questa voce: l’avviso di aggiornamento resta nascosto finché non esce una versione davvero nuova."
 };
