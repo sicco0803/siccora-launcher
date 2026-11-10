@@ -15,7 +15,12 @@ Developed and maintained by Mike Rieckhoff ([@sicco0803](https://github.com/sicc
   Launcher (e.g. a DevKit's project and flags)
 - **Library:** games, Unreal Engine versions, DevKits and tools (every DevKit
   available through Epic). Install, update (with preview), verify, remove;
-  pause, resume and cancel downloads
+  pause, resume and cancel downloads. New engines, DevKits and games show up
+  by themselves; Unreal Engine previews are marked "Preview"
+- **Add existing installs:** games, engines and DevKits from your Epic library
+  that are already on your PC (e.g. installed with Heroic) can be added without
+  a new download. The folder is checked against Epic's file list first; only
+  missing or outdated files are downloaded
 - **Options:** add and remove optional components (e.g. DLC maps, high-res
   textures, templates), just like in the Epic Games Launcher
 - **UE projects:** all your Unreal projects in one place (recently opened,
@@ -36,11 +41,22 @@ Developed and maintained by Mike Rieckhoff ([@sicco0803](https://github.com/sicc
   complete projects; reuses Epic's vault cache if an asset is already there
 - **Store:** Fab and the Epic Games Store on the right side of the window;
   you stay signed in
-- **Sign-in** through Epic's own login window
-- **Behaves like Windows software:** start with Windows (normally or quietly
-  in the notification area), keep running next to the clock when closed,
-  only one instance at a time
-- English, German, French, Spanish, Italian, Polish, Portuguese, Dutch; settings, automatic update check,
+- **Tools:**
+  - **Clean up storage:** finds logs, crash reports, caches and local cooks in
+    your projects and DevKits that Unreal creates again when needed, with live
+    progress. You choose what gets deleted; files from Epic are never touched
+  - **Crashes:** reads the crash reports of your projects and DevKits, groups
+    identical errors and explains them in simple words: what was open, which
+    plugin or engine area was involved, the affected asset, the last log
+    warnings and concrete steps to fix it
+  - **Ask AI:** send a crash to Claude, ChatGPT, Gemini or Grok with one click.
+    You see and can edit the text first; personal paths, names and IDs are
+    removed
+- **Sign-in** through Epic's own login window, also with Steam and other
+  providers
+- **Launcher updates** from GitHub releases, with patch notes shown before
+  updating; only signed setups with a matching checksum are installed
+- English, German, French, Spanish, Italian, Polish, Portuguese, Dutch; settings,
   download speed limit
 - ~200 MB RAM, 0 % CPU when idle
 
@@ -87,6 +103,9 @@ app/
     fab_install.py     Fab assets into projects/engines
     vault.py           Epic's vault cache / kept assets
     storepanel.py      store as a second WebView2 in the main window
+    cleanup.py         clean up storage (read-only scan, deletes only what you pick)
+    crashes.py         crash reports explained, text cleanup for "Ask AI"
+    selfupdate.py      launcher updates from GitHub releases
     tray.py            icon in the notification area
     autostart.py       start with Windows
     settings.py        settings
