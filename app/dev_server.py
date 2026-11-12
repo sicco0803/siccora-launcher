@@ -16,7 +16,7 @@ HOSTS = {f"127.0.0.1:{PORT}", f"localhost:{PORT}"}
 ORIGINS = {f"http://{h}" for h in HOSTS}
 ALLOWED = {"account", "library", "fab", "open_url", "open_folder", "open_login_page", "login",
            "settings", "downloads_list", "check_updates", "update_preview", "fab_options", "fab_plan", "set_language", "save_settings", "components", "components_summary",
-           "projects", "project_thumb", "delete_project_info", "home", "free_assets", "rename_project", "local_assets", "home_storage", "self_update", "adopt_options", "cleanup_scan", "cleanup_progress", "crash_reports", "ai_prompt"}  # Installieren usw. nur im echten App-Fenster
+           "projects", "project_thumb", "delete_project_info", "home", "free_assets", "rename_project", "local_assets", "home_storage", "self_update", "adopt_options", "cleanup_scan", "cleanup_progress", "crash_reports", "ai_prompt", "debug_event", "dlcs"}  # Installieren usw. nur im echten App-Fenster
 
 
 class Handler(SimpleHTTPRequestHandler):

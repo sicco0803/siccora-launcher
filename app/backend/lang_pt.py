@@ -119,5 +119,11 @@ TEXTS = {
     "Bitte den Hauptordner der Installation wählen, nicht das ganze Laufwerk.": "Escolhe a pasta principal da instalação, não a unidade inteira.",
     "Dieser Ordner gehört schon zu {title}.": "Esta pasta já pertence a {title}.",
     "Fertig – Versionsstand aktualisiert, es musste nichts geladen werden.": "Concluído – versão atualizada, não foi preciso transferir nada.",
-    "Bitte zuerst den Unreal Editor schließen.": "Fecha primeiro o Unreal Editor."
+    "Bitte zuerst den Unreal Editor schließen.": "Fecha primeiro o Unreal Editor.",
+    "Nachkontrolle: prüfe die geschriebenen Dateien …": "A verificar os ficheiros escritos …",
+    "Lade {n} fehlerhafte Dateien neu …": "A transferir de novo {n} ficheiros com defeito …",
+    "Fertig – Nachkontrolle: {bad} von {n} Dateien waren fehlerhaft und wurden neu geladen.": "Concluído – verificação: {bad} de {n} ficheiros tinham defeito e foram transferidos de novo.",
+    "Fertig – Nachkontrolle: alle {n} geänderten Dateien sind in Ordnung.": "Concluído – verificação: os {n} ficheiros alterados estão em ordem.",
+    "Fehlerhafte Dateien konnten nicht neu geladen werden – bitte „Prüfen“ ausführen.": "Não foi possível transferir de novo os ficheiros com defeito – executa «Verificar».",
+    "Bitte zuerst das Spiel installieren.": "Instala primeiro o jogo."
 }

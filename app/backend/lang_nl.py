@@ -119,5 +119,11 @@ TEXTS = {
     "Bitte den Hauptordner der Installation wählen, nicht das ganze Laufwerk.": "Kies de hoofdmap van de installatie, niet de hele schijf.",
     "Dieser Ordner gehört schon zu {title}.": "Deze map hoort al bij {title}.",
     "Fertig – Versionsstand aktualisiert, es musste nichts geladen werden.": "Klaar – versie bijgewerkt, er hoefde niets gedownload te worden.",
-    "Bitte zuerst den Unreal Editor schließen.": "Sluit eerst de Unreal Editor."
+    "Bitte zuerst den Unreal Editor schließen.": "Sluit eerst de Unreal Editor.",
+    "Nachkontrolle: prüfe die geschriebenen Dateien …": "Geschreven bestanden controleren …",
+    "Lade {n} fehlerhafte Dateien neu …": "{n} defecte bestanden opnieuw downloaden …",
+    "Fertig – Nachkontrolle: {bad} von {n} Dateien waren fehlerhaft und wurden neu geladen.": "Klaar – controle: {bad} van {n} bestanden waren defect en zijn opnieuw gedownload.",
+    "Fertig – Nachkontrolle: alle {n} geänderten Dateien sind in Ordnung.": "Klaar – controle: alle {n} gewijzigde bestanden zijn in orde.",
+    "Fehlerhafte Dateien konnten nicht neu geladen werden – bitte „Prüfen“ ausführen.": "Defecte bestanden konden niet opnieuw worden gedownload – voer \"Controleren\" uit.",
+    "Bitte zuerst das Spiel installieren.": "Installeer eerst de game."
 }

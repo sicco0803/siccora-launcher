@@ -15,7 +15,7 @@ import webbrowser
 import requests
 import webview
 
-from backend import autostart, cleanup, components, crashes, freefab, launch, projects, selfupdate, settings
+from backend import autostart, cleanup, components, crashes, debuglog, freefab, launch, projects, selfupdate, settings
 from backend.tray import Tray
 from backend.downloads import Downloads, hide_servers
 from backend.epic import DATA_DIR, LOGIN_URL, EpicService
@@ -29,7 +29,7 @@ from backend.vault import asset_updates, epic_cached, epic_vault_dirs
 
 # im fertigen Paket liegen ui/ usw. im Entpack-Ordner von PyInstaller
 HERE = getattr(sys, "_MEIPASS", None) or os.path.dirname(os.path.abspath(__file__))
-APP_VERSION = "1.0.4"
+APP_VERSION = "1.0.5"
 
 # Sprache fest in der Adresse: Fab ignoriert die Browsersprache und entscheidet sonst
 # selbst (bei Mike kam so eine fremde Sprache heraus); Fab: ?lang=de, Epic: /de/ bzw. /en-US/
@@ -52,6 +52,7 @@ def _safe(fn):
             return fn(*args, **kwargs)
         except Exception as e:
             traceback.print_exc()
+            debuglog.exception("api", f"{fn.__name__} fehlgeschlagen")
             return {"error": hide_servers(f"{type(e).__name__}: {e}")}
     wrapper.__name__ = fn.__name__
     return wrapper
@@ -84,11 +85,33 @@ class Api:
             return
         if job["status"] != "done" or job["action"] not in ("install", "update", "repair", "modify"):
             return
+        if job["action"] in ("install", "update"):
+            threading.Thread(target=self._follow_dlcs, args=(job,), daemon=True).start()
         comp = job.get("components") or {}
         if job["action"] == "modify" and components.record_change(
                 self._epic, app, comp.get("selected", []), comp.get("removed", []), comp.get("adding", False)):
             return  # Stand direkt nachgefuehrt - sofort aktuell
         threading.Thread(target=lambda: components.analyse(self._epic, app, refresh=True), daemon=True).start()
+
+    def _follow_dlcs(self, job):
+        """Wie der Epic Launcher: nach der Installation eines Spiels seine DLCs mitinstallieren,
+        nach einem Update die DLCs mit neuer Version nachziehen."""
+        try:
+            data = self._epic.library()
+            dlcs = [i for i in data["items"] if i["kind"] == "dlc" and i.get("parent") == job["appName"]]
+            for d in dlcs:
+                if job["action"] == "install" and not d["installed"]:
+                    self.install(d["appName"])
+                elif d["installed"] and d.get("updateAvailable"):
+                    self._queue_existing("update", d["appName"])
+            if dlcs:
+                debuglog.log("dlc", "Folgeauftraege", game=job["appName"], action=job["action"], dlcs=len(dlcs))
+        except Exception:
+            debuglog.exception("dlc", "DLC-Folgeauftraege fehlgeschlagen")
+
+    @_safe
+    def dlcs(self, app_name):
+        return {"items": self._dlcs_of(app_name)}
 
     # --- Einstellungen -------------------------------------------------------
     @_safe
@@ -178,11 +201,21 @@ class Api:
 
     @_safe
     def check_updates(self, force=False):
-        return self._epic.check_updates(min_age=0 if force else 1800)
+        t = time.time()
+        res = self._epic.check_updates(min_age=0 if force else 1800)
+        if res:
+            debuglog.log("library", "Abgleich", force=force, s=round(time.time() - t, 1),
+                         updates=[i["appName"] for i in res["items"] if i.get("updateAvailable")], neu=res.get("newItems"))
+        return res
 
     @_safe
     def update_preview(self, app_name):
-        return update_preview(self._epic, app_name)
+        t = time.time()
+        res = update_preview(self._epic, app_name)
+        debuglog.log("preview", app_name, s=round(time.time() - t, 1),
+                     **{k: res.get(k) for k in ("oldVersion", "newVersion", "upToDate", "acknowledged", "changed", "added",
+                                                "removed", "downloadMb", "error") if k in res})
+        return res
 
     # --- Komponenten (Optionen) ------------------------------------------------
     @_safe
@@ -440,14 +473,27 @@ class Api:
         return res
 
     @_safe
+    def debug_event(self, kind, text):
+        """Fehler aus der Oberflaeche (nur mit debug.flag protokolliert)."""
+        debuglog.log("ui", str(kind)[:40], text=str(text)[:2000])
+        return {"ok": True}
+
+    def self_update_progress(self):
+        return dict(selfupdate.progress)
+
+    @_safe
     def install_self_update(self):
         info = selfupdate.check(APP_VERSION)
+        debuglog.log("selfupdate", "Update angefordert", current=APP_VERSION, latest=info.get("latest"))
         if not (getattr(sys, "frozen", False) and info["setup"]):
             return {"error": tr("Kein Update zum Installieren.")}
         try:
             path = selfupdate.download(info)
         except (ValueError, requests.RequestException) as e:
+            debuglog.exception("selfupdate", "Download fehlgeschlagen")
             return {"error": tr(str(e)) if isinstance(e, ValueError) else tr("Update konnte nicht geladen werden.")}
+        selfupdate.progress["phase"] = "install"
+        debuglog.log("selfupdate", "Setup gestartet, Launcher wird beendet", path=path)
         selfupdate.install(path)
         # Launcher schliessen, damit das Setup die Dateien ersetzen kann (Downloads werden pausiert)
         self._close_confirmed = True
@@ -473,6 +519,12 @@ class Api:
         item = self._epic.find(app_name)
         if not item:
             return {"error": tr("Eintrag nicht in der Bibliothek gefunden.")}
+        if item["kind"] == "dlc":  # landet im Ordner des Spiels
+            parent = self._epic.installed().get(item["parent"])
+            if not parent:
+                return {"error": tr("Bitte zuerst das Spiel installieren.")}
+            return self._downloads.add("install", app_name, item["title"], parent_from_egl=parent["source"] == "egl",
+                                       parent=item["parent"])
         base = settings.get("installDir")
         if not base:
             return {"needsInstallDir": True}
@@ -570,7 +622,16 @@ class Api:
 
     @_safe
     def uninstall(self, app_name):
+        # erst die DLCs des Spiels sauber austragen (sie liegen in seinem Ordner)
+        installed = self._epic.installed()
+        for d in self._dlcs_of(app_name):
+            if d["appName"] in installed and installed[d["appName"]]["source"] == "legendary":
+                self._downloads.add("uninstall", d["appName"], d["title"])
         return self._queue_existing("uninstall", app_name)
+
+    def _dlcs_of(self, app_name):
+        data = self._epic.library()
+        return [i for i in data["items"] if i["kind"] == "dlc" and i.get("parent") == app_name]
 
     def _queue_existing(self, action, app_name):
         local = self._epic.installed().get(app_name)
@@ -653,7 +714,7 @@ class Api:
         updates = [{"appName": i["appName"], "title": i["title"], "kind": i["kind"], "image": i.get("image"),
                     "version": i.get("version"), "latest": i.get("latest")}
                    for i in lib if i["installed"] and i.get("updateAvailable")
-                   and (i["kind"] != "game" or settings.get("showGames"))]
+                   and (i["kind"] not in ("game", "dlc") or settings.get("showGames"))]
         try:
             fab = self._epic.fab_cached()  # nie laden: die Startseite soll sofort da sein
             titles = {v["artifactId"]: it["title"] for it in fab["items"] for v in it["versions"]}
@@ -788,7 +849,11 @@ def _tray_texts():
 
 
 def main(selftest=None):
+    started = time.time()
     _crash_log()
+    debuglog.prune()
+    debuglog.log("start", "Launcher startet", version=APP_VERSION, frozen=getattr(sys, "frozen", False),
+                 args=sys.argv[1:], exe=sys.executable)
     holder = {}
     if not selftest and not _first_instance(lambda: holder.get("show") and holder["show"]()):
         return  # laeuft schon - wurde nach vorn geholt
@@ -838,6 +903,7 @@ def main(selftest=None):
         if api._downloads.active() and not api._close_confirmed:
             threading.Thread(target=ask_close, daemon=True).start()  # hier nicht warten: das ist der Fenster-Thread
             return False
+        debuglog.log("start", "Launcher wird beendet", laufzeit_min=round((time.time() - started) / 60, 1))
         api._downloads.shutdown()
         if api._tray:
             api._tray.close()  # jetzt, solange die Nachrichtenschleifen noch laufen
@@ -863,6 +929,7 @@ def main(selftest=None):
 
     def on_first_load():
         window.events.loaded -= on_first_load
+        debuglog.log("start", "Oberflaeche geladen", s=round(time.time() - started, 1))
         try:
             guard_main(window)
         except Exception:

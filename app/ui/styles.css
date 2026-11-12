@@ -203,9 +203,15 @@ body.store-mode main { overflow: hidden; padding-bottom: 0; }
 
 .wide-panel { width: min(640px, 94vw); }
 .panel-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
-.facts { display: grid; grid-template-columns: auto 1fr; gap: 6px 18px; margin: 0; }
+.facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 18px; margin: 0; }
 .facts dt { color: var(--faint); }
-.facts dd { margin: 0; word-break: break-all; }
+.facts dd { margin: 0; overflow-wrap: anywhere; }
+.preview-lead { margin: 14px 0 12px; color: var(--ink); line-height: 1.5; }
+.preview-files { margin-top: 8px; }
+.preview-files summary { cursor: pointer; color: var(--faint); font-size: 12px; }
+.preview-files ul { max-height: 160px; overflow: auto; margin: 6px 0 0; padding-left: 18px; font-size: 12px; overflow-wrap: anywhere; }
+.bad-text { color: #F07A5A; font-weight: 500; }
+#preview .note { overflow-wrap: anywhere; }
 .note { padding: 10px 12px; background: var(--raised); border-left: 2px solid var(--brand); color: var(--muted); font-size: 13px; }
 .note.bad { border-left-color: #F07A5A; color: #F0A890; }
 .note ul { margin: 6px 0 0; padding-left: 18px; font-family: Consolas, monospace; font-size: 12px; }
@@ -368,6 +374,14 @@ body.home-mode #content { flex: 1 0 auto; display: flex; flex-direction: column;
 
 /* Fab: Bibliothek / Lokal gespeichert */
 .fab-tabs { display: flex; margin-bottom: 16px; }
+.dlc-link { display: block; margin-top: 4px; font-size: 12px; text-align: left; }
+.dlc-list { display: flex; flex-direction: column; max-height: 55vh; overflow: auto; margin-top: 8px; border-top: 1px solid var(--line-soft); }
+.dlc-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 12px; padding: 8px 0;
+  border-bottom: 1px solid var(--line-soft); }
+.dlc-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dlc-state { color: var(--faint); font-size: 12px; }
+.dlc-state.ok { color: var(--ok, #7BC67B); }
+.dlc-btns { display: flex; gap: 6px; }
 .tools-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; max-width: 1000px; }
 .tool-card { display: flex; flex-direction: column; gap: 10px; padding: 20px; background: var(--surface); border: 1px solid var(--line-soft); }
 .tool-card:hover { border-color: var(--line); }
@@ -380,6 +394,9 @@ body.home-mode #content { flex: 1 0 auto; display: flex; flex-direction: column;
 .clean-panel { width: min(560px, 92vw); }
 .clean-panel .track { height: 6px; margin-top: 8px; }
 .clean-panel .fill { transition: width .3s linear; }
+.update-progress { margin: 14px 0 4px; }
+.update-progress .track { height: 6px; }
+.update-progress .fill { transition: width .3s linear; }
 .clean-progress { max-width: 640px; margin: 48px auto; text-align: center; }
 .clean-progress h2 { margin: 0 0 16px; font: 500 18px var(--font-display); text-transform: uppercase; letter-spacing: .03em; }
 .clean-progress .track { height: 6px; }

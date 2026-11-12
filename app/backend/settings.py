@@ -35,6 +35,7 @@ DEFAULTS = {
     "useEpicVault": True,      # Fab-Assets aus Epics VaultCache kopieren statt neu laden (nur lesend)
     "keepAssets": False,       # geladene Fab-Assets im Zwischenordner behalten (wie Epics Vault)
     "closeToTray": False,      # X versteckt nur das Fenster, der Launcher laeuft im Infobereich weiter
+    "verifyAfter": True,       # Nachkontrolle nach Installation/Update wie beim Epic Launcher
 }
 
 
@@ -89,7 +90,7 @@ def save(changes):
         if key == "language":
             if value not in LANGUAGES:
                 return {"error": tr("Unbekannte Sprache.")}
-        elif key in ("showGames", "useEpicVault", "keepAssets", "closeToTray"):
+        elif key in ("showGames", "useEpicVault", "keepAssets", "closeToTray", "verifyAfter"):
             value = bool(value)
         elif key in ("installDir", "vaultDir"):
             if value is None:  # zuruecksetzen auf Standard

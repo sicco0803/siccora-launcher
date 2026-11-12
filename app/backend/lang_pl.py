@@ -119,5 +119,11 @@ TEXTS = {
     "Bitte den Hauptordner der Installation wählen, nicht das ganze Laufwerk.": "Wybierz główny folder instalacji, a nie cały dysk.",
     "Dieser Ordner gehört schon zu {title}.": "Ten folder należy już do {title}.",
     "Fertig – Versionsstand aktualisiert, es musste nichts geladen werden.": "Gotowe – zaktualizowano wersję, nie trzeba było nic pobierać.",
-    "Bitte zuerst den Unreal Editor schließen.": "Najpierw zamknij Unreal Editor."
+    "Bitte zuerst den Unreal Editor schließen.": "Najpierw zamknij Unreal Editor.",
+    "Nachkontrolle: prüfe die geschriebenen Dateien …": "Sprawdzanie zapisanych plików …",
+    "Lade {n} fehlerhafte Dateien neu …": "Ponowne pobieranie {n} uszkodzonych plików …",
+    "Fertig – Nachkontrolle: {bad} von {n} Dateien waren fehlerhaft und wurden neu geladen.": "Gotowe – kontrola: {bad} z {n} plików było uszkodzonych i zostały pobrane ponownie.",
+    "Fertig – Nachkontrolle: alle {n} geänderten Dateien sind in Ordnung.": "Gotowe – kontrola: wszystkie {n} zmienione pliki są w porządku.",
+    "Fehlerhafte Dateien konnten nicht neu geladen werden – bitte „Prüfen“ ausführen.": "Nie udało się ponownie pobrać uszkodzonych plików – uruchom „Sprawdź”.",
+    "Bitte zuerst das Spiel installieren.": "Najpierw zainstaluj grę."
 }

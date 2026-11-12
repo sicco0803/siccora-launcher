@@ -18,6 +18,7 @@ import sys
 import threading
 import time
 
+from . import debuglog
 from .epic import DATA_DIR, legendary_dir
 from . import settings
 from .fab_install import copy_into_place
@@ -74,13 +75,15 @@ class Downloads:
             threading.Thread(target=self._worker, args=(lane,), daemon=True).start()
 
     # --- oeffentliche Methoden ---------------------------------------------
-    def add(self, action, app_name, title, base_path=None, from_egl=False, fab=None, label=None, components=None):
+    def add(self, action, app_name, title, base_path=None, from_egl=False, fab=None, label=None, components=None,
+            parent=None, parent_from_egl=False):
         with self._lock:
             if any(j["appName"] == app_name and j["status"] in OPEN for j in self._jobs):
                 return {"error": tr("{title} ist bereits in der Liste (ggf. pausiert – dort fortsetzen).", title=title)}
             job = {"id": next(self._ids), "action": action, "label": label or ACTION_LABEL[action], "fab": fab,
                    "components": components,  # {"selected": [...], "removed": [...], "adding": bool}
                    "appName": app_name, "title": title, "basePath": base_path, "fromEgl": from_egl,
+                   "parent": parent, "parentFromEgl": parent_from_egl,  # DLC: Spiel, in dessen Ordner es landet
                    "status": "queued", "progress": 0.0, "speed": 0.0, "eta": "", "downloadedMb": 0.0,
                    "downloadMb": None, "installMb": None, "message": "", "log": [], "added": time.time()}
             if action == "fab":
@@ -232,11 +235,15 @@ class Downloads:
                 job["status"] = "running"
                 job["message"] = ""
                 self._save()
+            debuglog.job_start(job)
+            began = time.time()
             try:
                 self._run(job)
             except Exception as e:  # nie den Arbeiter sterben lassen
+                debuglog.exception("job", f"Auftrag {job['id']} abgestuerzt")
                 if job["status"] == "running":
                     job["status"], job["message"] = "failed", hide_servers(f"{type(e).__name__}: {e}")
+            debuglog.job_end(job, time.time() - began)
             with self._lock:
                 self._save()
             if self._on_change:
@@ -260,6 +267,15 @@ class Downloads:
                     return
                 return self._fail(job, "Übernahme aus dem Epic Launcher fehlgeschlagen.")
 
+        if job.get("parentFromEgl") and job.get("parent"):
+            # DLC zu einem Spiel aus dem Epic Launcher: Legendary muss das Spiel erst kennen
+            job["message"] = "Übernehme Installation aus dem Epic Launcher …"
+            if not self._exec(job, BRIDGE + ["import", job["parent"]]):
+                if self._stopped(job):
+                    return
+                return self._fail(job, "Übernahme aus dem Epic Launcher fehlgeschlagen.")
+            job["parentFromEgl"] = False
+
         if job["action"] == "uninstall":
             job["message"] = "Entferne Dateien …"
             ok = self._exec(job, LEGENDARY + ["-y", "uninstall", app])
@@ -279,8 +295,13 @@ class Downloads:
                     except OSError:
                         pass
                     job.update(phase="verify", verifyBad=0, verifyNum=0, verifyTotal=0, readSpeed=0.0)
+            if job["action"] == "update" and "oldVersion" not in job:
+                # fuer die Nachkontrolle: nur pruefen, was das Update geschrieben hat (bleibt bei Pause erhalten)
+                job["oldVersion"] = _installed_version(app)
             job["message"] = "Bereite Prüfung vor …" if job["action"] == "repair" else "Bereite Download vor …"
             ok = self._exec(job, LEGENDARY + args + _workers())
+            if ok and job["status"] == "running" and job["action"] in ("install", "update") and settings.get("verifyAfter"):
+                ok = self._verify_after(job, app)
             if ok and job["status"] == "running":
                 job["message"] = "Melde Stand an den Epic Launcher …"
                 self._exec(job, BRIDGE + ["export", app])  # nicht kritisch
@@ -289,7 +310,12 @@ class Downloads:
             return
         if ok:
             job["status"], job["progress"] = "done", 100.0
-            if job["action"] == "repair" and job.get("verifyTotal"):
+            if job.get("afterCheck") is not None and (job["afterCheck"] or job.get("verifyTotal")):
+                bad = job["afterCheck"]
+                job["message"] = ("Fertig – Nachkontrolle: {bad} von {n} Dateien waren fehlerhaft und wurden neu geladen."
+                                  if bad else "Fertig – Nachkontrolle: alle {n} geänderten Dateien sind in Ordnung.")
+                job["msgVars"] = {"bad": bad, "n": job.get("verifyTotal") or 0}
+            elif job["action"] == "repair" and job.get("verifyTotal"):
                 bad = job.get("verifyBad") or 0
                 job["message"] = ("Fertig – {bad} von {n} Dateien waren defekt oder fehlten und wurden neu geladen."
                                   if bad else "Fertig – alle {n} Dateien sind in Ordnung.")
@@ -417,8 +443,34 @@ class Downloads:
         if "installed data lock" in msg:
             msg = ("Ein anderes Programm installiert gerade mit Legendary (z. B. eine zweite Launcher-Instanz "
                    "oder Heroic). Bitte warten, bis es fertig ist, und dann erneut versuchen.")
+        debuglog.log("job", "Fehlgeschlagen", id=job["id"], app=job.get("appName"), msg=msg)
         if job["status"] == "running":
             job["status"], job["message"] = "failed", msg
+
+    def _verify_after(self, job, app):
+        """Nachkontrolle wie beim Epic Launcher; Fehlerhaftes wird gezielt neu geladen.
+        Gibt False nur bei Pause/Abbruch oder wenn die Reparatur scheitert."""
+        job.update(phase="verify", verifyBad=0, verifyNum=0, verifyTotal=0, readSpeed=0.0, progress=0.0, eta="")
+        job["message"], job["msgVars"] = "Nachkontrolle: prüfe die geschriebenen Dateien …", {}
+        cmd = BRIDGE + ["verify", app] + ([job["oldVersion"]] if job.get("oldVersion") else [])
+        if not self._exec(job, cmd):
+            if self._stopped(job):
+                return False
+            job.pop("afterCheck", None)  # Nachkontrolle ging nicht - das Update selbst ist trotzdem fertig
+            debuglog.log("job", "Nachkontrolle nicht moeglich", app=app)
+            return True
+        if job.get("afterResult") == "skipped":
+            return True
+        bad = job.get("verifyBad") or 0
+        job["afterCheck"] = bad
+        if not bad:
+            return True
+        job.update(phase=None, progress=0.0)
+        job["message"], job["msgVars"] = "Lade {n} fehlerhafte Dateien neu …", {"n": bad}
+        ok = self._exec(job, LEGENDARY + ["-y", "install", app, "--repair", "--skip-sdl", "--skip-dlcs"] + _workers())
+        if not ok and not self._stopped(job):
+            self._fail(job, "Fehlerhafte Dateien konnten nicht neu geladen werden – bitte „Prüfen“ ausführen.")
+        return ok
 
     def _exec(self, job, cmd, extra_env=None):
         env = dict(os.environ, PYTHONUNBUFFERED="1", PYTHONIOENCODING="utf-8", SICCORA_SETTINGS=settings.PATH,
@@ -429,9 +481,13 @@ class Downloads:
             proc = self._procs[job["id"]] = subprocess.Popen(
                 cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, env=env,
                 creationflags=NO_WINDOW, text=True, encoding="utf-8", errors="replace")
+        began = time.time()
+        debuglog.job_line(job, f">>> {' '.join(os.path.basename(c) if os.path.isabs(c) else c for c in cmd)}")
         for line in proc.stdout:
+            debuglog.job_line(job, line.rstrip())
             self._parse(job, line.rstrip())
         code = proc.wait()
+        debuglog.job_line(job, f"<<< beendet mit {code} nach {time.time() - began:.1f}s, Status {job['status']}")
         with self._lock:
             self._procs.pop(job["id"], None)
         return code == 0 and job["status"] == "running"
@@ -456,7 +512,11 @@ class Downloads:
                 job["verified"] = True
             return
         job["log"] = (log + [shown])[-200:]
-        if line.startswith("ADOPT_"):
+        if line.startswith(("VERIFY_OK", "VERIFY_BAD", "VERIFY_SKIPPED")):
+            job["afterResult"] = line.split()[0][7:].lower()
+            if line.startswith("VERIFY_OK"):
+                job["verifyTotal"] = job.get("verifyTotal") or int(line.split()[1])
+        elif line.startswith("ADOPT_"):
             job["adoptResult"] = {"ADOPT_WRONG_FOLDER": "wrong", "ADOPT_NEEDS_VERIFY": "verify"}.get(line.strip(), "ok")
         elif RE_VERIFY_BAD.search(line):
             job["verifyBad"] = (job.get("verifyBad") or 0) + 1
@@ -558,6 +618,14 @@ def _vault(job):
 
 def hide_servers(text):
     return RE_SERVER.sub("[Server]", text)
+
+
+def _installed_version(app):
+    try:
+        with open(os.path.join(legendary_dir(), "installed.json"), encoding="utf-8") as f:
+            return (json.load(f).get(app) or {}).get("version")
+    except (OSError, ValueError):
+        return None
 
 
 def _connections():

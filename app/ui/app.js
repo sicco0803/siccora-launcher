@@ -75,6 +75,15 @@ window.askClose = async () => {
   if (sure) call('close_app');
 };
 
+// Fehler der Oberflaeche ins Debug-Protokoll (das Backend speichert sie nur mit debug.flag)
+let uiErrors = 0;
+function reportUiError(kind, text) {
+  if (uiErrors++ > 50 || !api) return;
+  try { Promise.resolve(api.debug_event(kind, String(text).slice(0, 2000))).catch(() => {}); } catch { /* egal */ }
+}
+window.addEventListener('error', (e) => reportUiError('error', `${e.message} @ ${e.filename}:${e.lineno}`));
+window.addEventListener('unhandledrejection', (e) => reportUiError('promise', e.reason?.stack || e.reason));
+
 async function call(name, ...args) {
   const res = await api[name](...args);
   if (res && res.error) throw new Error(res.error);
@@ -243,6 +252,58 @@ function itemActions(i, extra = '', tile = false) {
     (tile ? '' : `<button class="btn danger small" data-uninstall="${app}" data-title="${esc(i.title)}">${esc(t('Entfernen'))}</button>`);
 }
 
+// --- DLCs: haengen am Spiel; ohne Spiel nicht installierbar ------------------------
+function dlcsOf(appName) {
+  return (state.library?.items || []).filter((i) => i.kind === 'dlc' && i.parent === appName);
+}
+
+function dlcLink(g) {
+  const list = dlcsOf(g.appName);
+  if (!list.length) return '';
+  const inst = list.filter((d) => d.installed).length;
+  const upd = list.some((d) => d.installed && d.updateAvailable);
+  return `<button class="link dlc-link" data-dlcs="${esc(g.appName)}">${esc(t('DLCs: {i} von {n} installiert', { i: inst, n: list.length }))}${upd ? ` · ${esc(t('Update'))}` : ''}</button>`;
+}
+
+function openDlcs(appName) {
+  const game = state.library?.items.find((i) => i.appName === appName);
+  if (!game) return;
+  const list = dlcsOf(appName).sort((a, b) => a.title.localeCompare(b.title));
+  const dlg = $('#dlcdlg');
+  $('#dlc-title').textContent = t('DLCs – {title}', { title: game.title });
+  const row = (d) => {
+    const job = busy(d.appName);
+    let state_ = d.installed ? t('Installiert') : t('Nicht installiert');
+    let btns = '';
+    if (job) state_ = `${t(STATUS[job.status])} · ${Math.floor(job.progress)} %`;
+    else if (!game.installed) btns = '';
+    else if (!d.installed) btns = `<button class="btn small" data-dlc-install="${esc(d.appName)}">${esc(t('Installieren'))}</button>`;
+    else {
+      btns = (d.updateAvailable ? `<button class="btn small" data-dlc-update="${esc(d.appName)}">${esc(t('Update'))}</button>` : '')
+        + `<button class="btn ghost small" data-dlc-remove="${esc(d.appName)}" data-title="${esc(d.title)}">${esc(t('Entfernen'))}</button>`;
+    }
+    return `<div class="dlc-row"><span class="dlc-name" title="${esc(d.title)}">${esc(d.title)}</span>
+      <span class="dlc-state${d.installed ? ' ok' : ''}">${esc(state_)}</span><span class="dlc-btns">${btns}</span></div>`;
+  };
+  $('#dlc-body').innerHTML = `${game.installed ? '' : `<p class="note">${esc(t('Installiere zuerst das Spiel – seine DLCs werden dann automatisch mitinstalliert.'))}</p>`}
+    <div class="dlc-list">${list.map(row).join('')}</div>`;
+  const missing = list.filter((d) => !d.installed && !busy(d.appName));
+  $('#dlc-all').hidden = !game.installed || !missing.length;
+  const refresh = async () => { await pollDownloads.once(); openDlcs(appName); };
+  const run = async (fn) => { try { await fn(); } catch (err) { toast(err.message); } await refresh(); };
+  $('#dlc-all').onclick = () => run(async () => { for (const d of missing) await call('install', d.appName); toast(t('Zur Warteschlange hinzugefügt.')); });
+  dlg.querySelectorAll('[data-dlc-install]').forEach((b) => { b.onclick = () => run(() => call('install', b.dataset.dlcInstall)); });
+  dlg.querySelectorAll('[data-dlc-update]').forEach((b) => { b.onclick = () => run(() => call('update', b.dataset.dlcUpdate)); });
+  dlg.querySelectorAll('[data-dlc-remove]').forEach((b) => {
+    b.onclick = async () => {
+      if (!(await askConfirm(t('„{title}“ wirklich entfernen?', { title: b.dataset.title }), { ok: 'Entfernen', danger: true }))) return;
+      run(() => call('uninstall', b.dataset.dlcRemove));
+    };
+  });
+  $('#dlc-close').onclick = () => { dlg.hidden = true; };
+  dlg.hidden = false;
+}
+
 function gameCard(g) {
   const job = busy(g.appName);
   const badge = g.installed ? `<span class="badge ok">${esc(t('Installiert'))}</span>` : '';
@@ -255,6 +316,7 @@ function gameCard(g) {
     <div class="body">
       <div class="tile-name"><div class="title" title="${esc(g.title)}">${esc(g.title)}</div>${update}</div>
       ${g.developer ? `<div class="sub">${esc(g.developer)}</div>` : ''}
+      ${dlcLink(g)}
       <div class="actions${start ? ' game-actions' : ''}">${itemActions(g, start, true)}</div>
     </div></article>`;
 }
@@ -460,9 +522,39 @@ function openSelfUpdate() {
 $('#update-close').onclick = () => ($('#updatedlg').hidden = true);
 $('#update-go').onclick = async () => {
   $('#update-go').disabled = true;
-  toast(t('Lade Update …'));
-  try { await call('install_self_update'); } catch (err) { toast(err.message); $('#update-go').disabled = false; }
+  $('#update-close').disabled = true;
+  $('#update-progress').hidden = false;
+  $('#update-info').hidden = true;
+  $('#update-step').textContent = t('Lade Update …');
+  let running = true;
+  (async () => {  // Fortschritt sichtbar machen - sonst wirkt ein langsamer Download wie ein Haenger
+    while (running) {
+      try { paintSelfUpdate(await call('self_update_progress')); } catch { /* naechster Versuch */ }
+      await new Promise((r) => setTimeout(r, 500));
+    }
+  })();
+  try {
+    await call('install_self_update');
+  } catch (err) {
+    toast(err.message);
+    $('#update-go').disabled = $('#update-close').disabled = false;
+    $('#update-progress').hidden = true;
+    $('#update-info').hidden = false;
+  } finally { running = false; }
 };
+
+function paintSelfUpdate(p) {
+  if (p.phase === 'download') {
+    $('#update-fill').style.width = `${p.total ? Math.min(100, (p.done / p.total) * 100) : 0}%`;
+    $('#update-step').textContent = t('Lade Update … {done} von {total}', { done: mb(p.done / 1048576), total: mb(p.total / 1048576) })
+      + (p.attempt > 1 ? ` · ${t('Langsame Verbindung – neuer Versuch {n} von {m}', { n: p.attempt, m: p.attempts })}` : '');
+  } else if (p.phase === 'verify') {
+    $('#update-fill').style.width = '100%';
+    $('#update-step').textContent = t('Prüfe Signatur und Prüfsumme …');
+  } else if (p.phase === 'install') {
+    $('#update-step').textContent = t('Starte Installation – der Launcher startet gleich neu …');
+  }
+}
 
 function statusUpdates(h) {
   const self = state.self?.available ? 1 : 0;
@@ -649,25 +741,40 @@ async function openPreview(appName) {
     body.innerHTML = `<p class="note bad">${esc(err.message)}</p>`;
     return;
   }
-  const comps = p.components.length ? p.components.join(', ') : t('keine optionalen');
+  // Klartext statt Technik: kurze Versionsnummern, echte Komponenten-Namen, ganze Saetze
+  const short = (v) => String(v || '').split('+')[0];
   const onlyVersion = p.upToDate && p.oldVersion !== p.newVersion;
+  const comps = p.components.length ? `${p.components.map(compName).join(', ')} – ${t('bleiben installiert')}` : t('keine');
+  const files = [
+    p.changed && t('{n} werden aktualisiert', { n: n0(p.changed) }),
+    p.added && t('{n} kommen neu dazu', { n: n0(p.added) }),
+    p.removed && t('{n} werden entfernt', { n: n0(p.removed) }),
+  ].filter(Boolean).join(', ');
+  const change = Math.abs(p.sizeChangeMb) < 1 ? t('kaum Änderung')
+    : t(p.sizeChangeMb > 0 ? '{size} mehr belegt' : '{size} weniger belegt', { size: mb(Math.abs(p.sizeChangeMb)) });
+  const lead = p.upToDate
+    ? t(p.acknowledged ? 'Bereits aktuell. Epic führt für diesen Eintrag intern eine abweichende Versionsnummer – der Update-Hinweis wird ausgeblendet, bis eine wirklich neue Version erscheint.'
+      : onlyVersion ? 'Es haben sich keine Dateien geändert, nur die Versionsnummer. Es wird nichts heruntergeladen, nur der Stand wird aktualisiert.'
+        : 'Bereits aktuell – nichts zu tun.')
+    : t('Das Update lädt {dl} herunter und bringt {title} auf Version {v}.', { dl: mb(p.downloadMb), title: p.title, v: short(p.newVersion) });
   const removed = p.removed
-    ? `<div class="note${p.removed > 50 ? ' bad' : ''}"><strong>${esc(t('{n} Dateien', { n: p.removed }))}</strong> ${esc(t('gibt es in der neuen Version nicht mehr und werden entfernt.'))}
+    ? `<div class="note${p.removed > 50 ? ' bad' : ''}">${esc(t('{n} Dateien gibt es in der neuen Version nicht mehr und werden entfernt.', { n: n0(p.removed) }))}
          ${esc(t('Deine eigenen Dateien (z. B. Mod-Projekte) sind nicht betroffen – entfernt wird nur, was Epic selbst installiert hat.'))}
-         <ul>${p.removedSample.map((f) => `<li>${esc(f)}</li>`).join('')}${p.removed > p.removedSample.length ? '<li>…</li>' : ''}</ul></div>` : '';
+         <details class="preview-files"><summary>${esc(t('Beispiele anzeigen'))}</summary>
+         <ul>${p.removedSample.map((f) => `<li>${esc(f)}</li>`).join('')}${p.removed > p.removedSample.length ? '<li>…</li>' : ''}</ul></details></div>` : '';
   body.innerHTML = `
+    <p class="preview-lead">${esc(lead)}</p>
     <dl class="facts">
       <dt>${esc(t('Was'))}</dt><dd>${esc(p.title)}</dd>
+      <dt>${esc(t('Version'))}</dt><dd title="${esc(`${p.oldVersion} → ${p.newVersion}`)}">${esc(p.upToDate && !onlyVersion ? short(p.oldVersion) : `${short(p.oldVersion)} → ${short(p.newVersion)}`)}</dd>
       <dt>${esc(t('Ordner'))}</dt><dd>${esc(p.path)}</dd>
-      <dt>${esc(t('Installiert'))}</dt><dd>${esc(p.oldVersion)}</dd>
-      <dt>${esc(t('Neu'))}</dt><dd>${esc(p.newVersion)}</dd>
-      <dt>${esc(t('Komponenten'))}</dt><dd>${esc(t('{c} – bleiben erhalten', { c: comps }))}</dd>
       ${p.upToDate ? '' : `
-      <dt>${esc(t('Download'))}</dt><dd>${mb(p.downloadMb)}</dd>
-      <dt>${esc(t('Dateien'))}</dt><dd>${esc(t('{c} geändert · {a} neu · {r} entfällt', { c: p.changed, a: p.added, r: p.removed }))}</dd>
-      <dt>${esc(t('Platz frei'))}</dt><dd>${mb(p.freeMb)}${p.enoughSpace ? '' : esc(t(' – zu wenig!'))}</dd>`}
+      <dt>${esc(t('Herunterladen'))}</dt><dd>${esc(mb(p.downloadMb))}</dd>
+      <dt>${esc(t('Dateien'))}</dt><dd>${esc(files || t('keine Änderungen'))}</dd>
+      <dt>${esc(t('Speicherplatz'))}</dt><dd>${esc(t('{change} · noch {free} frei', { change, free: mb(p.freeMb) }))}${p.enoughSpace ? '' : ` <strong class="bad-text">${esc(t('– zu wenig Platz!'))}</strong>`}</dd>`}
+      <dt>${esc(t('Optionale Inhalte'))}</dt><dd>${esc(comps)}</dd>
     </dl>
-    ${p.upToDate ? `<p class="note">${esc(t(p.acknowledged ? 'Bereits aktuell. Epic führt für diesen Eintrag intern eine abweichende Versionsnummer – der Update-Hinweis wird ausgeblendet, bis eine wirklich neue Version erscheint.' : onlyVersion ? 'Es haben sich keine Dateien geändert, nur die Versionsnummer. Es wird nichts heruntergeladen, nur der Stand wird aktualisiert.' : 'Bereits aktuell – nichts zu tun.'))}</p>` : removed}
+    ${p.upToDate ? '' : removed}
     ${!p.upToDate && p.source === 'egl' ? `<p class="note">${esc(t('Wurde mit dem Epic Launcher installiert. Er bekommt den neuen Stand danach automatisch mitgeteilt.'))}</p>` : ''}`;
   // Neue Versionsnummer ohne geaenderte Dateien: das Update muss trotzdem laufen, sonst bleibt die Meldung stehen
   $('#preview-start').hidden = p.upToDate ? !onlyVersion : !p.enoughSpace;
@@ -1208,6 +1315,8 @@ async function render() {
           `<label class="switch"><input type="checkbox" data-setting="useEpicVault" ${s.useEpicVault ? 'checked' : ''}><span></span></label>`)}
         <p class="help vault-dirs">${esc(t('Gefundene Vault-Ordner des Epic Launchers:'))} ${s.epicVaultDirs.length
           ? s.epicVaultDirs.map((d) => `<code>${esc(d)}</code>`).join(' ') : esc(t('keine'))}</p>
+        ${setting('Nachkontrolle nach Installation und Update', 'Wie beim Epic Launcher: Nach einem Update werden die geänderten Dateien, nach einer Installation alle Dateien mit Epics Prüfsummen verglichen. Fehlerhaftes wird automatisch neu geladen. Bei großen DevKits dauert eine Neuinstallation dadurch länger.',
+          `<label class="switch"><input type="checkbox" data-setting="verifyAfter" ${s.verifyAfter ? 'checked' : ''}><span></span></label>`)}
         ${setting('Download-Tempo', 'Begrenzt das Tempo aller Downloads, damit genug Leitung für anderes bleibt. Gilt sofort, auch für laufende Downloads.',
           `<select data-setting="speedLimit">${s.speedChoices.map((n) =>
             `<option value="${n}" ${n === s.speedLimit ? 'selected' : ''}>${n ? `${n} MB/s` : esc(t('Maximal'))}</option>`).join('')}</select>`)}
@@ -1892,6 +2001,7 @@ $('#content').addEventListener('click', async (e) => {
       show('fab');
     }
     else if (b.dataset.deleteProject) await openDelete(b.dataset.deleteProject);
+    else if (b.dataset.dlcs) openDlcs(b.dataset.dlcs);
     else if (b.dataset.askAi) openAskAi(state.crashShown?.[Number(b.dataset.askAi)]);
     else if (b.dataset.toolStart) {  // frisch starten, kein altes Ergebnis zeigen
       if (b.dataset.toolStart === 'cleanup' && !state.cleanScan) state.cleanup = null;

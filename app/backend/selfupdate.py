@@ -18,6 +18,7 @@ import time
 
 import requests
 
+from . import debuglog
 from .epic import DATA_DIR
 
 REPO = "sicco0803/siccora-launcher"
@@ -29,6 +30,17 @@ UPDATE_DIR = os.path.join(DATA_DIR, "update")
 MAX_AGE = 6 * 3600
 RE_NOTES_BLOCK = re.compile(r"<!--\s*notes:([a-z]{2})\s*\n(.*?)-->", re.S)
 HEADERS = {"Accept": "application/vnd.github+json", "User-Agent": "SiccoraLauncher"}
+# Download: GitHub verteilt ueber viele Server, ab und zu erwischt man einen sehr langsamen.
+# Kriecht die Verbindung, wird sie neu aufgebaut (der letzte Versuch laeuft ohne Mindesttempo durch)
+ATTEMPTS = 4
+MIN_SPEED = 100 * 1024  # Byte/s, gemessen je CHECK_EVERY Sekunden
+CHECK_EVERY = 15
+READ_TIMEOUT = 20
+progress = {"phase": "", "done": 0, "total": 0, "attempt": 0, "attempts": ATTEMPTS}
+
+
+class _TooSlow(Exception):
+    pass
 
 
 def _version(text):
@@ -95,10 +107,12 @@ def check(current, force=False):
     else:
         try:
             release = _fetch()
+            debuglog.log("selfupdate", "GitHub gefragt", force=force, tag=release.get("tag"), setup=bool(release.get("setup")))
             os.makedirs(DATA_DIR, exist_ok=True)
             with open(CACHE, "w", encoding="utf-8") as f:
                 json.dump(release, f)
         except (requests.RequestException, ValueError):  # offline, GitHub-Limit: letzter bekannter Stand
+            debuglog.exception("selfupdate", "GitHub nicht erreichbar - letzter bekannter Stand")
             release = cached or {"tag": None, "checked": 0}
     latest = (release.get("tag") or "").lstrip("vV") or None
     available = bool(latest) and not release.get("draft") and not release.get("prerelease") \
@@ -134,26 +148,62 @@ def download(info):
         except OSError:
             pass
     path = os.path.join(UPDATE_DIR, setup["name"])
-    sha = hashlib.sha256()
-    with requests.get(setup["url"], headers={"User-Agent": "SiccoraLauncher"}, stream=True, timeout=60) as r:
-        r.raise_for_status()
-        if not r.url.startswith(("https://github.com/", "https://objects.githubusercontent.com/",
-                                 "https://release-assets.githubusercontent.com/")):
-            raise ValueError("Unerwartete Download-Adresse.")
-        with open(path + ".part", "wb") as f:
-            for chunk in r.iter_content(1024 * 256):
-                sha.update(chunk)
-                f.write(chunk)
+    sha = None
+    for attempt in range(1, ATTEMPTS + 1):
+        try:
+            sha = _download_once(setup, path + ".part", attempt, enforce_speed=attempt < ATTEMPTS)
+            break
+        except (_TooSlow, requests.ConnectionError, requests.Timeout) as e:
+            debuglog.log("selfupdate", "Download-Versuch abgebrochen", attempt=attempt, grund=type(e).__name__,
+                         mb=round(progress["done"] / 1048576, 2))
+            if attempt == ATTEMPTS:
+                progress["phase"] = ""
+                raise requests.ConnectionError("download failed")
+    progress["phase"] = "verify"
+    debuglog.log("selfupdate", "Download fertig", attempt=progress["attempt"], mb=round(progress["done"] / 1048576, 2))
     if sha.hexdigest() != setup["sha256"]:
+        debuglog.log("selfupdate", "Pruefsumme passt nicht")
         os.remove(path + ".part")
         raise ValueError("Prüfsumme des Updates stimmt nicht – Download verworfen.")
     os.replace(path + ".part", path)
     if getattr(sys, "frozen", False):
-        mine = _signer(sys.executable)
-        if mine and _signer(path) != mine:
+        mine, theirs = _signer(sys.executable), _signer(path)
+        debuglog.log("selfupdate", "Signatur", launcher=mine, setup=theirs)
+        if mine and theirs != mine:
             os.remove(path)
             raise ValueError("Das Update ist nicht vom selben Herausgeber signiert – verworfen.")
     return path
+
+
+def _download_once(setup, part, attempt, enforce_speed):
+    """Ein Versuch mit frischer Verbindung. Wirft _TooSlow, wenn es zu langsam vorangeht."""
+    progress.update(phase="download", done=0, total=setup.get("size") or 0, attempt=attempt)
+    began = time.time()
+    sha = hashlib.sha256()
+    with requests.get(setup["url"], headers={"User-Agent": "SiccoraLauncher"}, stream=True,
+                      timeout=(15, READ_TIMEOUT)) as r:
+        r.raise_for_status()
+        if not r.url.startswith(("https://github.com/", "https://objects.githubusercontent.com/",
+                                 "https://release-assets.githubusercontent.com/")):
+            raise ValueError("Unerwartete Download-Adresse.")
+        progress["total"] = int(r.headers.get("Content-Length") or progress["total"] or 0)
+        done, mark_time, mark_done = 0, time.time(), 0
+        with open(part, "wb") as f:
+            for chunk in r.iter_content(1024 * 256):
+                sha.update(chunk)
+                f.write(chunk)
+                done += len(chunk)
+                progress["done"] = done
+                now = time.time()
+                if now - mark_time >= CHECK_EVERY:
+                    if enforce_speed and (done - mark_done) / (now - mark_time) < MIN_SPEED:
+                        debuglog.log("selfupdate", "zu langsam", attempt=attempt,
+                                     kb_s=round((done - mark_done) / (now - mark_time) / 1024), host=r.url.split("/")[2])
+                        raise _TooSlow()
+                    mark_time, mark_done = now, done
+    debuglog.log("selfupdate", "Versuch fertig", attempt=attempt, s=round(time.time() - began, 1),
+                 mb_s=round(done / 1048576 / max(time.time() - began, 0.1), 2))
+    return sha
 
 
 def install(path):

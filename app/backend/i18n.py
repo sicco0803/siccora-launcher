@@ -169,6 +169,12 @@ EN = {
     "Dieser Ordner gehört schon zu {title}.": "This folder already belongs to {title}.",
     "Fertig – Versionsstand aktualisiert, es musste nichts geladen werden.": "Done – version updated, nothing had to be downloaded.",
     "Bitte zuerst den Unreal Editor schließen.": "Please close the Unreal Editor first.",
+    "Nachkontrolle: prüfe die geschriebenen Dateien …": "Checking the written files …",
+    "Lade {n} fehlerhafte Dateien neu …": "Downloading {n} faulty files again …",
+    "Fertig – Nachkontrolle: {bad} von {n} Dateien waren fehlerhaft und wurden neu geladen.": "Done – check: {bad} of {n} files were faulty and have been downloaded again.",
+    "Fertig – Nachkontrolle: alle {n} geänderten Dateien sind in Ordnung.": "Done – check: all {n} changed files are fine.",
+    "Fehlerhafte Dateien konnten nicht neu geladen werden – bitte „Prüfen“ ausführen.": "Faulty files could not be downloaded again – please run \"Verify\".",
+    "Bitte zuerst das Spiel installieren.": "Please install the game first.",
 }
 
 LANGUAGES = ("de", "en", "fr", "es", "it", "pl", "pt", "nl")

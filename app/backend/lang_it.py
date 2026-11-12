@@ -119,5 +119,11 @@ TEXTS = {
     "Bitte den Hauptordner der Installation wählen, nicht das ganze Laufwerk.": "Scegli la cartella principale dell’installazione, non l’intera unità.",
     "Dieser Ordner gehört schon zu {title}.": "Questa cartella appartiene già a {title}.",
     "Fertig – Versionsstand aktualisiert, es musste nichts geladen werden.": "Fatto – versione aggiornata, non è stato necessario scaricare nulla.",
-    "Bitte zuerst den Unreal Editor schließen.": "Chiudi prima Unreal Editor."
+    "Bitte zuerst den Unreal Editor schließen.": "Chiudi prima Unreal Editor.",
+    "Nachkontrolle: prüfe die geschriebenen Dateien …": "Controllo dei file scritti …",
+    "Lade {n} fehlerhafte Dateien neu …": "Riscaricamento di {n} file difettosi …",
+    "Fertig – Nachkontrolle: {bad} von {n} Dateien waren fehlerhaft und wurden neu geladen.": "Fatto – controllo: {bad} file su {n} erano difettosi e sono stati riscaricati.",
+    "Fertig – Nachkontrolle: alle {n} geänderten Dateien sind in Ordnung.": "Fatto – controllo: tutti i {n} file modificati sono a posto.",
+    "Fehlerhafte Dateien konnten nicht neu geladen werden – bitte „Prüfen“ ausführen.": "Impossibile riscaricare i file difettosi: esegui «Verifica».",
+    "Bitte zuerst das Spiel installieren.": "Installa prima il gioco."
 }

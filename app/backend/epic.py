@@ -14,6 +14,7 @@ import traceback
 import requests
 from legendary.core import LegendaryCore
 
+from . import debuglog
 from .i18n import tr
 
 DATA_DIR = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")), "SiccoraLauncher")
@@ -24,6 +25,7 @@ UE_NS = "ue"
 MEGASCANS_NS = "89efe5924d3d467c839449ab6ab52e7f"
 TOOL_WORDS = ("devkit", "modkit", "mod kit", "editor", "sdk")
 REQUEST_PAUSE = 0.3  # Sekunden zwischen Katalog-Anfragen
+LIB_SCHEMA = 2  # hochzaehlen, wenn library.json neue Eintragsarten bekommt (2: DLCs) -> einmal neu aufbauen
 FAB_SCHEMA = 3  # hochzaehlen, wenn fab.json neue Felder bekommt -> Cache wird neu geladen
 
 
@@ -162,7 +164,7 @@ class EpicService:
         session = self.core.egs.session
         host = self.core.egs._catalog_host
         for ns, ids in wanted.items():
-            missing = [i for i in ids if i not in cache]
+            missing = [i for i in ids if i not in cache or (cache[i].get("dlc") and "mainApp" not in cache[i])]
             for start in range(0, len(missing), 50):
                 chunk = missing[start:start + 50]
                 r = session.get(f"https://{host}/catalog/api/shared/namespace/{ns}/bulk/items",
@@ -174,9 +176,12 @@ class EpicService:
                     continue  # beim naechsten Aktualisieren erneut versuchen
                 r.raise_for_status()
                 for cid, item in r.json().items():
+                    main = item.get("mainGameItem") or {}
                     cache[cid] = {
                         "title": item.get("title"),
-                        "dlc": bool(item.get("mainGameItem")),
+                        "dlc": bool(main),
+                        # appName des Hauptspiels - so haengt Legendary DLCs an ihr Spiel
+                        "mainApp": next((x.get("appId") for x in main.get("releaseInfo") or [] if x.get("appId")), None),
                         "categories": [c.get("path") for c in item.get("categories", [])],
                         "image": _image(item.get("keyImages"), "DieselGameBoxTall", "DieselGameBox", "Thumbnail"),
                         "wide": _image(item.get("keyImages"), "DieselGameBox", "Featured", "DieselGameBoxTall"),
@@ -188,7 +193,7 @@ class EpicService:
 
     def library(self, refresh=False):
         cached = _load("library.json", None)
-        if cached and not refresh:
+        if cached and not refresh and cached.get("schema") == LIB_SCHEMA:
             return self._with_install_state(cached)
         return self._with_install_state(self._fetch_library())
 
@@ -198,6 +203,11 @@ class EpicService:
         data = _load("library.json", None)
         if not data:
             return None
+        if data.get("schema") != LIB_SCHEMA:  # aeltere Launcher-Version: Bibliothek einmal neu aufbauen
+            try:
+                data = self._fetch_library()
+            except Exception:
+                traceback.print_exc()
         announce = []
         if time.time() - data.get("checked", data.get("updated", 0)) >= min_age:
             with self._lock:
@@ -292,8 +302,14 @@ class EpicService:
             cats = set(info["categories"])
             title = info["title"] or name
             launchable = "addons/launchable" in cats
-            if (info["dlc"] or cats == {"addons"}) and not launchable:
-                continue  # DLC und reine Zusatzinhalte
+            if info["dlc"] and not launchable:
+                if info.get("mainApp"):  # wird unten nur behalten, wenn das Hauptspiel in der Bibliothek ist
+                    items.append({"appName": name, "kind": "dlc", "parent": info["mainApp"], "title": title, "namespace": ns,
+                                  "catalogItemId": a["catalogItemId"], "latest": a.get("buildVersion"),
+                                  "image": info["image"], "wide": info["wide"], "developer": info["developer"]})
+                continue
+            if cats == {"addons"} and not launchable:
+                continue  # reine Zusatzinhalte ohne eigenen Download-Sinn
             # Epic fuehrt DevKits/ModKits/Editoren unter "engines" oder "software"
             if cats & {"engines", "software"} or launchable or any(w in title.lower() for w in TOOL_WORDS):
                 kind = "tool"
@@ -303,12 +319,18 @@ class EpicService:
                           "catalogItemId": a["catalogItemId"], "latest": a.get("buildVersion"),
                           "image": info["image"], "wide": info["wide"], "developer": info["developer"]})
 
+        # DLCs nur zu Spielen, die das Konto besitzt (ohne Hauptspiel nicht installierbar)
+        games = {i["appName"] for i in items if i["kind"] == "game"}
+        items = [i for i in items if i["kind"] != "dlc" or i["parent"] in games]
         items.sort(key=lambda i: (i["kind"], _engine_sort(i) if i["kind"] == "engine" else i["title"].lower()))
         with self._lock:
             self._mark_previews(items)
         now = time.time()
         # noch nicht eingeordnete Eintraege gelten nicht als gesehen - so holt der naechste Abgleich sie nach
-        data = {"updated": now, "checked": now, "items": items, "seenApps": sorted(_other_apps(assets) - pending)}
+        data = {"updated": now, "checked": now, "items": items, "seenApps": sorted(_other_apps(assets) - pending),
+                "schema": LIB_SCHEMA}
+        debuglog.log("library", "Bibliothek neu aufgebaut", assets=len(assets), eintraege=len(items),
+                     nicht_eingeordnet=sorted(pending)[:20])
         _save("library.json", data)
         return data
 
@@ -318,6 +340,7 @@ class EpicService:
         Version schon dem aktuellen Manifest entspricht, gilt diese Nummer als erledigt - bis
         Epic eine neue meldet."""
         acks = _load("version_ack.json", {})
+        debuglog.log("library", "Abweichende Epic-Versionsnummer als aktuell markiert", app=app_name, latest=latest)
         acks[app_name] = latest
         _save("version_ack.json", acks)
 

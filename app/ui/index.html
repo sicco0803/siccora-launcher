@@ -144,6 +144,10 @@
     <p class="update-versions" id="update-versions"></p>
     <h3 class="update-title" data-i18n="Das ist neu">Das ist neu</h3>
     <div id="update-notes"></div>
+    <div class="update-progress" id="update-progress" hidden>
+      <div class="track"><div class="fill" id="update-fill"></div></div>
+      <p class="clean-step" id="update-step"></p>
+    </div>
     <p class="note" id="update-info"></p>
     <div class="panel-actions">
       <button class="btn ghost" id="update-close" data-i18n="Später">Später</button>
@@ -159,6 +163,17 @@
     <div class="panel-actions">
       <button class="btn ghost" id="del-close" data-i18n="Abbrechen">Abbrechen</button>
       <button class="btn danger" id="del-go" hidden disabled data-i18n="In den Papierkorb">In den Papierkorb</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="dlcdlg" hidden role="dialog" aria-modal="true" aria-labelledby="dlc-title">
+  <div class="panel wide-panel">
+    <h2 id="dlc-title"></h2>
+    <div id="dlc-body"></div>
+    <div class="panel-actions">
+      <button class="btn ghost" id="dlc-close" data-i18n="Schließen">Schließen</button>
+      <button class="btn" id="dlc-all" hidden data-i18n="Alle installieren">Alle installieren</button>
     </div>
   </div>
 </div>
