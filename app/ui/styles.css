@@ -42,7 +42,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
   display: flex; flex-direction: column; padding: 20px 0; }
 .brand { display: flex; gap: 12px; align-items: center; padding: 0 20px 24px;
   font: 500 18px/1.05 var(--font-display); text-transform: uppercase; letter-spacing: .04em; }
-.brand small { color: var(--brand); font-size: 12px; letter-spacing: .18em; }
+.brand > span { color: var(--brand); }
+.brand small { color: var(--ink); font-size: 12px; letter-spacing: .18em; }
 nav { display: flex; flex-direction: column; }
 .nav { all: unset; cursor: pointer; padding: 11px 20px; border-left: 2px solid transparent;
   color: var(--muted); font: 500 14px var(--font-display); text-transform: uppercase; letter-spacing: .08em;
@@ -206,6 +207,7 @@ body.store-mode main { overflow: hidden; padding-bottom: 0; }
 .facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 18px; margin: 0; }
 .facts dt { color: var(--faint); }
 .facts dd { margin: 0; overflow-wrap: anywhere; }
+.preview-hint { margin: -28px 0 8px; text-align: center; color: var(--faint); font-size: 12px; }
 .preview-lead { margin: 14px 0 12px; color: var(--ink); line-height: 1.5; }
 .preview-files { margin-top: 8px; }
 .preview-files summary { cursor: pointer; color: var(--faint); font-size: 12px; }
@@ -585,3 +587,6 @@ body { grid-template-columns: 190px minmax(0, 1fr); }
 .crash-foot summary { cursor: pointer; color: var(--faint); font-size: 12px; }
 .crash-foot pre { margin: 8px 0 0; padding: 10px; background: var(--bg); border: 1px solid var(--line-soft); color: var(--muted); font-size: 12px;
   white-space: pre-wrap; overflow-wrap: anywhere; max-height: 240px; overflow-y: auto; }
+.fill.busy { opacity: .45; animation: busy-pulse 1.4s ease-in-out infinite; }
+@keyframes busy-pulse { 50% { opacity: .9; } }
+@media (prefers-reduced-motion: reduce) { .fill.busy { animation: none; } }

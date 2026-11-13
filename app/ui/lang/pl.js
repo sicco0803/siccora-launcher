@@ -635,5 +635,13 @@ I18N.pl = {
   "DLCs – {title}": "DLC – {title}",
   "Installiere zuerst das Spiel – seine DLCs werden dann automatisch mitinstalliert.": "Najpierw zainstaluj grę – jej DLC zostaną wtedy zainstalowane automatycznie.",
   "Alle installieren": "Zainstaluj wszystkie",
-  "Schließen": "Zamknij"
+  "Schließen": "Zamknij",
+  "Verbinde mit Epic …": "Łączenie z Epic …",
+  "Lese die installierte Dateiliste …": "Wczytywanie listy zainstalowanych plików …",
+  "Lade die neue Dateiliste von Epic …": "Pobieranie nowej listy plików z Epic …",
+  "Entpacke die neue Dateiliste …": "Rozpakowywanie nowej listy plików …",
+  "Prüfe installierte Komponenten auf der Platte …": "Sprawdzanie zainstalowanych komponentów na dysku …",
+  "Vergleiche alte und neue Version …": "Porównywanie starej i nowej wersji …",
+  "Bei großen DevKits dauert das etwas – ihre Dateilisten haben über eine Million Einträge.": "Przy dużych DevKitach to chwilę trwa – ich listy plików mają ponad milion pozycji.",
+  "Wird entfernt …": "Usuwanie …"
 };

@@ -4,10 +4,9 @@ Fehlende Werte kommen aus DEFAULTS; save() prueft jeden Wert, bevor er
 gespeichert wird - Unsinniges (z. B. ein nicht vorhandener Ordner) wird abgelehnt.
 """
 import configparser
-import json
 import os
 
-from .epic import DATA_DIR, legendary_dir
+from .epic import DATA_DIR, legendary_dir, read_json, write_json
 from .i18n import LANGUAGES, tr
 
 PATH = os.path.join(DATA_DIR, "settings.json")
@@ -40,10 +39,8 @@ DEFAULTS = {
 
 
 def load():
-    try:
-        with open(PATH, encoding="utf-8") as f:
-            saved = json.load(f)
-    except (OSError, ValueError):
+    saved = read_json(PATH, {})
+    if not isinstance(saved, dict):
         saved = {}
     data = {**DEFAULTS, **saved}
     if data["maxWorkers"] is None:
@@ -56,11 +53,7 @@ def get(key):
 
 
 def _write(data):
-    os.makedirs(DATA_DIR, exist_ok=True)
-    stored = {k: v for k, v in data.items() if k in DEFAULTS}
-    with open(PATH + ".tmp", "w", encoding="utf-8") as f:
-        json.dump(stored, f, indent=1)
-    os.replace(PATH + ".tmp", PATH)
+    write_json(PATH, {k: v for k, v in data.items() if k in DEFAULTS}, indent=1)
 
 
 def _local_dir(path):

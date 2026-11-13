@@ -1,7 +1,7 @@
 """Ausfuehrliches Protokoll zur Fehlersuche.
 
-Nur aktiv, wenn im Datenordner (%LOCALAPPDATA%\\SiccoraLauncher) die Datei debug.flag liegt -
-ohne sie passiert hier nichts. Alles bleibt auf dem PC, nichts wird gesendet.
+Nur aktiv, wenn die Datei %USERPROFILE%\\.siccora-debug\\enabled existiert -
+ohne sie passiert hier nichts. Protokolle liegen im selben Ordner unter logs\\. Alles bleibt auf dem PC, nichts wird gesendet.
 Keine Anmeldedaten; Server-Adressen und alles, was nach Token/Passwort aussieht, wird ausgeblendet.
 
     logs/debug-JJJJ-MM-TT.log            Ablauf: Start, Updates, Abgleich, Fehler, Zeiten
@@ -14,9 +14,11 @@ import threading
 import time
 import traceback
 
-DATA_DIR = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")), "SiccoraLauncher")
-FLAG = os.path.join(DATA_DIR, "debug.flag")
-LOG_DIR = os.path.join(DATA_DIR, "logs")
+# Bewusst im Benutzerordner und nicht in AppData: Programme aus App-Paketen (MSIX) sehen bei
+# AppData eine eigene, umgeleitete Kopie - Schalter und Protokolle waeren dann nicht gemeinsam sichtbar.
+DEBUG_HOME = os.path.join(os.path.expanduser("~"), ".siccora-debug")
+FLAG = os.path.join(DEBUG_HOME, "enabled")
+LOG_DIR = os.path.join(DEBUG_HOME, "logs")
 JOB_DIR = os.path.join(LOG_DIR, "jobs")
 KEEP_DAYS = 14
 

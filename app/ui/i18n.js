@@ -649,6 +649,14 @@ const I18N = {
     'Installiere zuerst das Spiel – seine DLCs werden dann automatisch mitinstalliert.': 'Install the game first – its DLCs are then installed automatically.',
     'Alle installieren': 'Install all',
     'Schließen': 'Close',
+    'Verbinde mit Epic …': 'Connecting to Epic …',
+    'Lese die installierte Dateiliste …': 'Reading the installed file list …',
+    'Lade die neue Dateiliste von Epic …': 'Downloading the new file list from Epic …',
+    'Entpacke die neue Dateiliste …': 'Unpacking the new file list …',
+    'Prüfe installierte Komponenten auf der Platte …': 'Checking installed components on disk …',
+    'Vergleiche alte und neue Version …': 'Comparing old and new version …',
+    'Bei großen DevKits dauert das etwas – ihre Dateilisten haben über eine Million Einträge.': 'For large DevKits this takes a moment – their file lists have more than a million entries.',
+    'Wird entfernt …': 'Removing …',
   },
 };
 

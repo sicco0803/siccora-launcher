@@ -239,14 +239,22 @@ function busy(appName) {
 }
 
 // Knoepfe je Zustand - gleich fuer Spiele, Engines und DevKits
+// Kurzer Stand eines Auftrags: Entfernen meldet keinen Fortschritt, darum ohne Prozent
+function jobBadge(job) {
+  if (job.action === 'uninstall' && job.status === 'running') return t('Wird entfernt …');
+  if (job.status !== 'running' || job.phase === 'verify' && !job.verifyTotal) return t(STATUS[job.status]);
+  return `${t(STATUS[job.status])} · ${Math.floor(job.progress)} %`;
+}
+
 function itemActions(i, extra = '', tile = false) {
   const app = esc(i.appName);
   const job = busy(i.appName);
-  if (job) return `<button class="btn ghost small" data-view-go="downloads">${esc(t(STATUS[job.status]))} · ${Math.floor(job.progress)} %</button>`;
+  if (job) return `<button class="btn ghost small" data-view-go="downloads">${esc(jobBadge(job))}</button>`;
   if (!i.installed) return `<button class="btn small" data-install="${app}">${esc(t('Installieren'))}</button>`;
   // in der Box sitzen Update (neben dem Namen) und Entfernen (X oben rechts) woanders
   return (i.updateAvailable && !tile ? `<button class="btn small" data-update="${app}">${esc(t('Update'))}</button>` : '') + extra +
-    (i.kind !== 'game' ? `<button class="btn ghost small" data-options="${app}">${esc(t('Optionen'))}</button>` : '') +
+    // nur, wo es optionale Inhalte gibt (unbekannt = anzeigen, bis der Launcher es weiss)
+    (i.kind !== 'game' && i.hasOptions !== false ? `<button class="btn ghost small" data-options="${app}">${esc(t('Optionen'))}</button>` : '') +
     `<button class="btn ghost small" data-folder="${esc(i.path)}">${esc(t('Ordner'))}</button>` +
     `<button class="btn ghost small" data-repair="${app}" title="${esc(t('Dateien prüfen und defekte neu laden'))}">${esc(t('Prüfen'))}</button>` +
     (tile ? '' : `<button class="btn danger small" data-uninstall="${app}" data-title="${esc(i.title)}">${esc(t('Entfernen'))}</button>`);
@@ -275,7 +283,7 @@ function openDlcs(appName) {
     const job = busy(d.appName);
     let state_ = d.installed ? t('Installiert') : t('Nicht installiert');
     let btns = '';
-    if (job) state_ = `${t(STATUS[job.status])} · ${Math.floor(job.progress)} %`;
+    if (job) state_ = jobBadge(job);
     else if (!game.installed) btns = '';
     else if (!d.installed) btns = `<button class="btn small" data-dlc-install="${esc(d.appName)}">${esc(t('Installieren'))}</button>`;
     else {
@@ -283,7 +291,7 @@ function openDlcs(appName) {
         + `<button class="btn ghost small" data-dlc-remove="${esc(d.appName)}" data-title="${esc(d.title)}">${esc(t('Entfernen'))}</button>`;
     }
     return `<div class="dlc-row"><span class="dlc-name" title="${esc(d.title)}">${esc(d.title)}</span>
-      <span class="dlc-state${d.installed ? ' ok' : ''}">${esc(state_)}</span><span class="dlc-btns">${btns}</span></div>`;
+      <span class="dlc-state${d.installed && !job ? ' ok' : ''}">${esc(state_)}</span><span class="dlc-btns">${btns}</span></div>`;
   };
   $('#dlc-body').innerHTML = `${game.installed ? '' : `<p class="note">${esc(t('Installiere zuerst das Spiel – seine DLCs werden dann automatisch mitinstalliert.'))}</p>`}
     <div class="dlc-list">${list.map(row).join('')}</div>`;
@@ -300,7 +308,8 @@ function openDlcs(appName) {
       run(() => call('uninstall', b.dataset.dlcRemove));
     };
   });
-  $('#dlc-close').onclick = () => { dlg.hidden = true; };
+  $('#dlc-close').onclick = () => { dlg.hidden = true; state.dlcOpen = null; };
+  state.dlcOpen = appName;
   dlg.hidden = false;
 }
 
@@ -482,7 +491,7 @@ function selfUpdateCard(s) {
     ? `<button class="btn small" data-self-update="1">${esc(t('Update'))}</button>`
     : s.page ? `<button class="btn ghost small" data-url="${esc(s.page)}">${esc(t('Auf GitHub'))}</button>` : '';
   return `<div class="status-update">
-    <div class="status-art"><img class="mark" src="siccora-mark.svg" alt=""></div>
+    <div class="status-art"><img class="mark" src="siccora-mark.png" alt=""></div>
     <div class="status-text"><div class="tile-title">Siccora Launcher</div>
       <div class="tile-sub">${esc(s.current)} → ${esc(s.latest)}</div></div>
     ${action}</div>`;
@@ -707,11 +716,14 @@ async function pollDownloads() {
     const running = jobs.find((j) => j.status === 'running');
     const open = jobs.filter((j) => OPEN.includes(j.status));
     $('#dl-count').hidden = !open.length;
+    if (state.dlcOpen && !$('#dlcdlg').hidden) openDlcs(state.dlcOpen);  // DLC-Fenster live halten
     $('#dl-count').textContent = open.length;
     $('#dl-mini').hidden = !running;
     if (running) {
-      $('#dl-mini-title').textContent = `${running.title} · ${Math.floor(running.progress)} %`;
-      $('#dl-mini-fill').style.width = `${running.progress}%`;
+      const removing = running.action === 'uninstall';
+      $('#dl-mini-title').textContent = `${running.title} · ${removing ? t('Wird entfernt …') : `${Math.floor(running.progress)} %`}`;
+      $('#dl-mini-fill').style.width = removing ? '100%' : `${running.progress}%`;
+      $('#dl-mini-fill').classList.toggle('busy', removing);
     }
     const finished = jobs.some((j) => {
       const old = before.find((o) => o.id === j.id);
@@ -730,17 +742,38 @@ async function pollDownloads() {
   }
 }
 
+const PREVIEW_STEPS = {
+  login: 'Verbinde mit Epic …',
+  read: 'Lese die installierte Dateiliste …',
+  download: 'Lade die neue Dateiliste von Epic …',
+  unpack: 'Entpacke die neue Dateiliste …',
+  disk: 'Prüfe installierte Komponenten auf der Platte …',
+  compare: 'Vergleiche alte und neue Version …',
+};
+
 // --- Update-Vorschau: erst zeigen, was passieren wuerde, dann auf Wunsch starten
 async function openPreview(appName) {
   const body = $('#preview-body');
   $('#preview').hidden = false;
   $('#preview-start').hidden = true;
-  body.innerHTML = `<p class="loading">${esc(t('Vergleiche installierte Version mit der neuen … bei großen DevKits bis zu 2 Minuten.'))}</p>`;
+  body.innerHTML = `<p class="loading" id="preview-step">${esc(t('Verbinde mit Epic …'))}</p>
+    <p class="preview-hint">${esc(t('Bei großen DevKits dauert das etwas – ihre Dateilisten haben über eine Million Einträge.'))}</p>`;
   let p;
+  let waiting = true;
+  (async () => {
+    while (waiting) {
+      try {
+        const s = await call('update_preview_progress');
+        const el = $('#preview-step');
+        if (el && PREVIEW_STEPS[s.step]) el.textContent = t(PREVIEW_STEPS[s.step]);
+      } catch { /* naechster Versuch */ }
+      await new Promise((r) => setTimeout(r, 400));
+    }
+  })();
   try { p = await call('update_preview', appName); } catch (err) {
     body.innerHTML = `<p class="note bad">${esc(err.message)}</p>`;
     return;
-  }
+  } finally { waiting = false; }
   // Klartext statt Technik: kurze Versionsnummern, echte Komponenten-Namen, ganze Saetze
   const short = (v) => String(v || '').split('+')[0];
   const onlyVersion = p.upToDate && p.oldVersion !== p.newVersion;
@@ -1946,7 +1979,6 @@ $('#content').addEventListener('click', async (e) => {
     }
     else if (b.dataset.storeGo) await call('store_go', b.dataset.storeGo, state.view);
     else if (b.dataset.storeWindow) await call('open_store', state.storeTab);
-    else if (b.dataset.launch) { await call('launch_engine', b.dataset.launch); toast(t('Unreal Editor wird gestartet …')); }
     else if (b.dataset.start) {
       toast(t('{title} wird gestartet …', { title: b.dataset.title || '' }));
       await call('launch_app', b.dataset.start);

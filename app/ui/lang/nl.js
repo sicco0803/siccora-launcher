@@ -635,5 +635,13 @@ I18N.nl = {
   "DLCs – {title}": "DLC's – {title}",
   "Installiere zuerst das Spiel – seine DLCs werden dann automatisch mitinstalliert.": "Installeer eerst de game – de DLC's worden dan automatisch mee geïnstalleerd.",
   "Alle installieren": "Alles installeren",
-  "Schließen": "Sluiten"
+  "Schließen": "Sluiten",
+  "Verbinde mit Epic …": "Verbinden met Epic …",
+  "Lese die installierte Dateiliste …": "Geïnstalleerde bestandslijst lezen …",
+  "Lade die neue Dateiliste von Epic …": "Nieuwe bestandslijst van Epic downloaden …",
+  "Entpacke die neue Dateiliste …": "Nieuwe bestandslijst uitpakken …",
+  "Prüfe installierte Komponenten auf der Platte …": "Geïnstalleerde onderdelen op de schijf controleren …",
+  "Vergleiche alte und neue Version …": "Oude en nieuwe versie vergelijken …",
+  "Bei großen DevKits dauert das etwas – ihre Dateilisten haben über eine Million Einträge.": "Bij grote DevKits duurt dit even – hun bestandslijsten hebben meer dan een miljoen items.",
+  "Wird entfernt …": "Wordt verwijderd …"
 };

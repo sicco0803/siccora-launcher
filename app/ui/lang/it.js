@@ -635,5 +635,13 @@ I18N.it = {
   "DLCs – {title}": "DLC – {title}",
   "Installiere zuerst das Spiel – seine DLCs werden dann automatisch mitinstalliert.": "Installa prima il gioco: i suoi DLC verranno installati automaticamente.",
   "Alle installieren": "Installa tutto",
-  "Schließen": "Chiudi"
+  "Schließen": "Chiudi",
+  "Verbinde mit Epic …": "Connessione a Epic …",
+  "Lese die installierte Dateiliste …": "Lettura dell’elenco dei file installati …",
+  "Lade die neue Dateiliste von Epic …": "Download del nuovo elenco dei file da Epic …",
+  "Entpacke die neue Dateiliste …": "Decompressione del nuovo elenco dei file …",
+  "Prüfe installierte Komponenten auf der Platte …": "Verifica dei componenti installati sul disco …",
+  "Vergleiche alte und neue Version …": "Confronto tra vecchia e nuova versione …",
+  "Bei großen DevKits dauert das etwas – ihre Dateilisten haben über eine Million Einträge.": "Per i DevKit grandi ci vuole un po’: i loro elenchi di file hanno oltre un milione di voci.",
+  "Wird entfernt …": "Rimozione …"
 };

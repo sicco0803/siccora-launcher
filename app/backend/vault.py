@@ -21,6 +21,20 @@ from concurrent.futures import ThreadPoolExecutor
 from . import settings
 
 KEPT_MARKER = ".siccora-version"
+_versions = {}  # Pfad der Dateiliste -> ((Aenderungszeit, Groesse), Version) - Startseite liest sonst jedes Mal alle neu
+
+
+def _manifest_version(core, path):
+    """Version aus einer Vault-Dateiliste; erneut gelesen nur, wenn sich die Datei geaendert hat."""
+    st = os.stat(path)
+    stamp = (st.st_mtime_ns, st.st_size)
+    hit = _versions.get(path)
+    if hit and hit[0] == stamp:
+        return hit[1]
+    with open(path, "rb") as f:
+        version = core.load_manifest(f.read()).meta.build_version
+    _versions[path] = (stamp, version)
+    return version
 
 
 def epic_vault_dirs():
@@ -135,8 +149,7 @@ def asset_updates(core, titles):
                 if e.name not in current or not os.path.isfile(path):
                     continue
                 try:
-                    with open(path, "rb") as f:
-                        check(e.name, core.load_manifest(f.read()).meta.build_version, "epic")
+                    check(e.name, _manifest_version(core, path), "epic")
                 except Exception:  # unlesbar -> ueberspringen
                     continue
     kept_root = settings.get("vaultDir")
@@ -207,8 +220,7 @@ def _local_version(core, where, path):
         if where == "kept":
             with open(os.path.join(path, KEPT_MARKER), encoding="utf-8") as f:
                 return f.read().strip()
-        with open(os.path.join(path, "manifest"), "rb") as f:
-            return core.load_manifest(f.read()).meta.build_version
+        return _manifest_version(core, os.path.join(path, "manifest"))
     except Exception:  # fehlt oder unlesbar
         return None
 

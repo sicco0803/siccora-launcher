@@ -21,6 +21,17 @@ VSVersionInfo(
 )
 "@ | Set-Content (Join-Path $PSScriptRoot "version_info.txt") -Encoding utf8
 
+# Bauumgebung muss exakt den festgeschriebenen Paketversionen entsprechen (requirements.txt) -
+# so landet nie unbemerkt eine andere (evtl. untergeschobene) Paketversion im Launcher
+$pinned = Select-String -Path (Join-Path $PSScriptRoot "requirements.txt") -Pattern '^([A-Za-z0-9_.-]+==\S+)' |
+    ForEach-Object { $_.Matches[0].Groups[1].Value.ToLower() -replace '_', '-' } | Sort-Object
+$actual = & $py -m pip freeze --all --exclude pip | ForEach-Object { $_.ToLower() -replace '_', '-' } | Sort-Object
+$diff = Compare-Object $pinned $actual
+if ($diff) {
+    $diff | ForEach-Object { Write-Host ("  {0} {1}" -f $(if ($_.SideIndicator -eq '<=') { 'erwartet:' } else { 'installiert:' }), $_.InputObject) }
+    throw "Bauumgebung weicht von packaging\requirements.txt ab"
+}
+
 Write-Host "Baue Siccora Launcher $version ..."
 & $py -m PyInstaller (Join-Path $PSScriptRoot "siccora.spec") --noconfirm --clean `
     --distpath (Join-Path $root "dist") --workpath (Join-Path $root "build")

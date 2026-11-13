@@ -5,6 +5,7 @@ import json
 import os
 import shutil
 import socket
+import subprocess
 import sys
 import threading
 import time
@@ -23,13 +24,13 @@ from backend.storepanel import StorePanel, guard_main
 from backend.fab_install import KINDS, compatibility, read_project
 from backend.fab_install import plan as fab_plan
 from backend.i18n import set_lang, tr
-from backend.preview import _installed_manifest, update_preview
+from backend.preview import _installed_manifest, update_preview, progress as preview_progress
 from backend import vault
 from backend.vault import asset_updates, epic_cached, epic_vault_dirs
 
 # im fertigen Paket liegen ui/ usw. im Entpack-Ordner von PyInstaller
 HERE = getattr(sys, "_MEIPASS", None) or os.path.dirname(os.path.abspath(__file__))
-APP_VERSION = "1.0.5"
+APP_VERSION = "1.0.6"
 
 # Sprache fest in der Adresse: Fab ignoriert die Browsersprache und entscheidet sonst
 # selbst (bei Mike kam so eine fremde Sprache heraus); Fab: ?lang=de, Epic: /de/ bzw. /en-US/
@@ -87,6 +88,7 @@ class Api:
             return
         if job["action"] in ("install", "update"):
             threading.Thread(target=self._follow_dlcs, args=(job,), daemon=True).start()
+            threading.Thread(target=lambda: components.refresh_options(self._epic), daemon=True).start()
         comp = job.get("components") or {}
         if job["action"] == "modify" and components.record_change(
                 self._epic, app, comp.get("selected", []), comp.get("removed", []), comp.get("adding", False)):
@@ -207,6 +209,10 @@ class Api:
             debuglog.log("library", "Abgleich", force=force, s=round(time.time() - t, 1),
                          updates=[i["appName"] for i in res["items"] if i.get("updateAvailable")], neu=res.get("newItems"))
         return res
+
+    @_safe
+    def update_preview_progress(self):
+        return dict(preview_progress)
 
     @_safe
     def update_preview(self, app_name):
@@ -749,19 +755,23 @@ class Api:
         return freefab.current([i.get("url") for i in self._epic.fab_cached()["items"]], refresh)
 
     @_safe
-    def launch_engine(self, path):
-        exe = os.path.join(path or "", "Engine", "Binaries", "Win64", "UnrealEditor.exe")
-        if not os.path.isfile(exe):
-            return {"error": tr("UnrealEditor.exe nicht gefunden.")}
-        os.startfile(exe)
+    def open_folder(self, path):
+        # nur lokale, vollstaendige Ordnerpfade, keine Netzwerkpfade (\\server\...) - und immer nur der
+        # Explorer: ein Ordner wird angezeigt, nie etwas ausgefuehrt
+        path = os.path.normpath(str(path or ""))
+        if os.path.isabs(path) and not path.startswith(("\\\\", "//")) and os.path.isdir(path):
+            explorer = os.path.join(os.environ.get("SystemRoot", r"C:\Windows"), "explorer.exe")  # voller Pfad
+            subprocess.Popen([explorer, path], close_fds=True)
         return {"ok": True}
 
-    @_safe
-    def open_folder(self, path):
-        # nur lokale Ordner, keine Netzwerkpfade (\\server\...)
-        if path and not path.startswith(("\\\\", "//")) and os.path.isdir(path):
-            os.startfile(path)
-        return {"ok": True}
+
+def _quiet(fn, *args):
+    """Hintergrundarbeit, deren Fehler nur ins Protokoll gehen."""
+    try:
+        fn(*args)
+    except Exception:
+        traceback.print_exc()
+        debuglog.exception("background", f"{getattr(fn, '__name__', fn)} fehlgeschlagen")
 
 
 class _Redacted:
@@ -922,6 +932,8 @@ def main(selftest=None):
             api._tray = Tray(os.path.join(HERE, "ui", "siccora.ico"), holder["show"], quit_from_tray, _tray_texts())
         except Exception:
             traceback.print_exc()  # ohne Symbol weiter - das X beendet dann normal
+        # einmal nach dem Start: wo gibt es ueberhaupt "Optionen"? (nur fuer neue/aktualisierte Versionen)
+        threading.Thread(target=lambda: _quiet(components.refresh_options, api._epic), daemon=True).start()
         if selftest:
             _selftest(window, selftest)()
 

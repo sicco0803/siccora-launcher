@@ -635,5 +635,13 @@ I18N.pt = {
   "DLCs – {title}": "DLC – {title}",
   "Installiere zuerst das Spiel – seine DLCs werden dann automatisch mitinstalliert.": "Instala primeiro o jogo – os DLC são depois instalados automaticamente.",
   "Alle installieren": "Instalar todos",
-  "Schließen": "Fechar"
+  "Schließen": "Fechar",
+  "Verbinde mit Epic …": "A ligar à Epic …",
+  "Lese die installierte Dateiliste …": "A ler a lista de ficheiros instalada …",
+  "Lade die neue Dateiliste von Epic …": "A transferir a nova lista de ficheiros da Epic …",
+  "Entpacke die neue Dateiliste …": "A descomprimir a nova lista de ficheiros …",
+  "Prüfe installierte Komponenten auf der Platte …": "A verificar os componentes instalados no disco …",
+  "Vergleiche alte und neue Version …": "A comparar a versão antiga e a nova …",
+  "Bei großen DevKits dauert das etwas – ihre Dateilisten haben über eine Million Einträge.": "Em DevKits grandes isto demora um pouco – as listas de ficheiros têm mais de um milhão de entradas.",
+  "Wird entfernt …": "A remover …"
 };

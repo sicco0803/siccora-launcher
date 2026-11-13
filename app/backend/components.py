@@ -22,7 +22,7 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 
-from .epic import DATA_DIR
+from .epic import DATA_DIR, _load, _save, write_json
 from .i18n import tr
 from .preview import _installed_manifest
 
@@ -41,6 +41,35 @@ def _fingerprint(service, app_name, local):
         igame = service.core.lgd.get_installed_game(app_name)
         tags = sorted(t for t in (igame.install_tags or []) if t)
     return {"path": local["path"], "version": local["version"], "source": local["source"], "tags": tags}
+
+
+def refresh_options(service):
+    """Im Hintergrund: welche installierten Engines/DevKits ueberhaupt optionale Inhalte haben.
+    Ergebnis je Version in options.json - die Oberflaeche zeigt "Optionen" nur, wo es etwas gibt.
+    Liest nur die installierte Dateiliste (kein Netz, keine Pruefung der Platte)."""
+    if not _running.acquire(blocking=False):
+        return  # laeuft gerade eine Komponenten-Pruefung - beim naechsten Mal
+    try:
+        known = _load("options.json", {})
+        installed = service.installed()
+        for item in service.library()["items"]:
+            local = installed.get(item["appName"])
+            if item["kind"] not in ("engine", "tool") or not local:
+                continue
+            if known.get(item["appName"], {}).get("version") == local["version"]:
+                continue
+            try:
+                manifest = _installed_manifest(service, item["appName"], local)
+            except Exception:
+                manifest = None
+            if manifest is None:
+                continue  # unbekannt lassen -> Button bleibt sichtbar
+            has = any(fm.install_tags for fm in manifest.file_manifest_list.elements)
+            del manifest
+            known[item["appName"]] = {"version": local["version"], "has": has}
+            _save("options.json", known)
+    finally:
+        _running.release()
 
 
 def forget(app_name):
@@ -70,10 +99,7 @@ def analyse(service, app_name, refresh=False):
         result = _scan(service, app_name, local)
     if "error" not in result:
         result["fingerprint"], result["checked"] = fp, time.time()
-        os.makedirs(CACHE_DIR, exist_ok=True)
-        with open(_cache_path(app_name) + ".tmp", "w", encoding="utf-8") as f:
-            json.dump(result, f)
-        os.replace(_cache_path(app_name) + ".tmp", _cache_path(app_name))
+        write_json(_cache_path(app_name), result)
     return result
 
 
@@ -176,9 +202,7 @@ def record_change(service, app_name, selected, removed, added):
         return False  # Ordner/Version anders (z. B. Update nebenbei) -> lieber neu pruefen
     cached["source"] = local["source"]
     cached["fingerprint"] = _fingerprint(service, app_name, local)
-    with open(_cache_path(app_name) + ".tmp", "w", encoding="utf-8") as f:
-        json.dump(cached, f)
-    os.replace(_cache_path(app_name) + ".tmp", _cache_path(app_name))
+    write_json(_cache_path(app_name), cached)
     return True
 
 

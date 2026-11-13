@@ -635,5 +635,13 @@ I18N.fr = {
   "DLCs – {title}": "DLC – {title}",
   "Installiere zuerst das Spiel – seine DLCs werden dann automatisch mitinstalliert.": "Installez d’abord le jeu – ses DLC seront alors installés automatiquement.",
   "Alle installieren": "Tout installer",
-  "Schließen": "Fermer"
+  "Schließen": "Fermer",
+  "Verbinde mit Epic …": "Connexion à Epic …",
+  "Lese die installierte Dateiliste …": "Lecture de la liste des fichiers installés …",
+  "Lade die neue Dateiliste von Epic …": "Téléchargement de la nouvelle liste de fichiers depuis Epic …",
+  "Entpacke die neue Dateiliste …": "Décompression de la nouvelle liste de fichiers …",
+  "Prüfe installierte Komponenten auf der Platte …": "Vérification des composants installés sur le disque …",
+  "Vergleiche alte und neue Version …": "Comparaison de l’ancienne et de la nouvelle version …",
+  "Bei großen DevKits dauert das etwas – ihre Dateilisten haben über eine Million Einträge.": "Pour les gros DevKits, cela prend un moment – leurs listes de fichiers comptent plus d’un million d’entrées.",
+  "Wird entfernt …": "Suppression …"
 };

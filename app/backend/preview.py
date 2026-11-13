@@ -8,6 +8,7 @@ import glob
 import json
 import os
 import shutil
+import threading
 import types
 
 from .i18n import tr
@@ -61,7 +62,28 @@ def _selected(fm, tags):
     return not fm.install_tags or any(t in tags for t in fm.install_tags)
 
 
+# Live-Stand fuer die Oberflaeche ("Lade Dateiliste von Epic ..."), wird parallel abgefragt
+progress = {"step": ""}
+
+
+def _installed_tags(core, app_name, local):
+    """Gewaehlte Komponenten: bei Launcher-Installationen kennt Legendary sie schon (schnell),
+    beim Epic Launcher werden sie von der Platte abgelesen (bei DevKits ueber eine Minute)."""
+    if local["source"] == "legendary":
+        igame = core.lgd.get_installed_game(app_name)
+        if igame and igame.install_tags:
+            return sorted(t for t in igame.install_tags if t)
+    return None
+
+
 def update_preview(service, app_name):
+    try:
+        return _update_preview(service, app_name)
+    finally:
+        progress["step"] = ""
+
+
+def _update_preview(service, app_name):
     local = service.installed().get(app_name)
     if not local:
         return {"error": tr("Nicht installiert.")}
@@ -70,17 +92,38 @@ def update_preview(service, app_name):
         return {"error": tr("Eintrag nicht in der Bibliothek - bitte einmal „Aktualisieren“.")}
 
     core = service.core
+    progress["step"] = "login"
     core.login()
+
+    # neue Dateiliste schon laden, waehrend die installierte eingelesen wird
+    game = types.SimpleNamespace(namespace=item["namespace"], catalog_item_id=item["catalogItemId"], app_name=app_name)
+    fetched = {}
+
+    def fetch():
+        try:
+            fetched["bytes"] = core.get_cdn_manifest(game)[0]
+        except Exception as e:  # im Hauptablauf weiterwerfen
+            fetched["error"] = e
+    loader = threading.Thread(target=fetch, daemon=True)
+    loader.start()
+    progress["step"] = "read"
     old = _installed_manifest(service, app_name, local)
     if old is None:
         return {"error": tr("Dateiliste der installierten Version nicht gefunden - Vorschau nicht möglich.")}
-
-    game = types.SimpleNamespace(namespace=item["namespace"], catalog_item_id=item["catalogItemId"], app_name=app_name)
-    new_bytes, *_ = core.get_cdn_manifest(game)
-    new = core.load_manifest(new_bytes)
+    progress["step"] = "download"
+    loader.join()
+    if "error" in fetched:
+        raise fetched["error"]
+    progress["step"] = "unpack"
+    new = core.load_manifest(fetched["bytes"])
 
     root = local["path"]
-    tags = _present_tags(old, root)
+    progress["step"] = "compare"
+    tags = _installed_tags(core, app_name, local)
+    if tags is None:
+        progress["step"] = "disk"
+        tags = _present_tags(old, root)
+        progress["step"] = "compare"
     old_files = {fm.filename: fm for fm in old.file_manifest_list.elements if _selected(fm, tags)}
     new_files = {fm.filename: fm for fm in new.file_manifest_list.elements if _selected(fm, tags)}
 

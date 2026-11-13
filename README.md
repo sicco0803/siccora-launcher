@@ -88,6 +88,9 @@ downloads.
 
 `Start.bat` runs the launcher from source using the Python environment in
 `spike/.venv` (Python 3.12 with `legendary-gl`, `pywebview`, `requests`).
+The exact package versions, with checksums, are pinned in
+`packaging/requirements.txt`; `build.ps1` refuses to build if the environment
+differs from it.
 
 ```
 app/
@@ -106,6 +109,7 @@ app/
     cleanup.py         clean up storage (read-only scan, deletes only what you pick)
     crashes.py         crash reports explained, text cleanup for "Ask AI"
     selfupdate.py      launcher updates from GitHub releases
+    signcheck.py       code signature check of update files (Windows API)
     tray.py            icon in the notification area
     autostart.py       start with Windows
     settings.py        settings

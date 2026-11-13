@@ -18,7 +18,7 @@ import time
 
 import requests
 
-from . import debuglog
+from . import debuglog, signcheck
 from .epic import DATA_DIR
 
 REPO = "sicco0803/siccora-launcher"
@@ -126,14 +126,13 @@ def check(current, force=False):
 def _signer(path):
     """Herausgeber einer gueltig signierten Datei als "Name|Aussteller-Organisation", sonst None.
     Bewusst nicht der Fingerabdruck: das Zertifikat wird jaehrlich erneuert, der Fingerabdruck
-    wechselt dabei. Die Organisation stellt sicher, dass es dieselbe Zertifizierungsstelle ist."""
-    cmd = ("$s = Get-AuthenticodeSignature -LiteralPath $env:SICCORA_SIGCHECK; "
-           "if ($s.Status -eq 'Valid') { $c = $s.SignerCertificate; "
-           "$c.GetNameInfo('SimpleName', $false) + '|' + [regex]::Match($c.Issuer, 'O=([^,]+)').Groups[1].Value }")
-    out = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", cmd],
-                         env=dict(os.environ, SICCORA_SIGCHECK=path), capture_output=True, text=True,
-                         timeout=60, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-    return out.stdout.strip() or None
+    wechselt dabei. Die Organisation stellt sicher, dass es dieselbe Zertifizierungsstelle ist.
+    Direkt ueber Windows (signcheck), nicht ueber PowerShell - das kann blockiert sein."""
+    try:
+        return signcheck.signer(path)
+    except Exception:  # im Zweifel gilt die Datei als nicht gueltig signiert
+        debuglog.exception("selfupdate", "Signaturpruefung fehlgeschlagen")
+        return None
 
 
 def download(info):
@@ -167,9 +166,11 @@ def download(info):
         raise ValueError("Prüfsumme des Updates stimmt nicht – Download verworfen.")
     os.replace(path + ".part", path)
     if getattr(sys, "frozen", False):
+        # Streng: ohne gueltige Signatur auf BEIDEN Seiten wird nichts installiert. Offizielle
+        # Versionen sind immer signiert; selbst gebaute ohne Signatur aktualisiert man ueber GitHub.
         mine, theirs = _signer(sys.executable), _signer(path)
         debuglog.log("selfupdate", "Signatur", launcher=mine, setup=theirs)
-        if mine and theirs != mine:
+        if not mine or theirs != mine:
             os.remove(path)
             raise ValueError("Das Update ist nicht vom selben Herausgeber signiert – verworfen.")
     return path

@@ -19,7 +19,7 @@ import threading
 import time
 
 from . import debuglog
-from .epic import DATA_DIR, legendary_dir
+from .epic import DATA_DIR, legendary_dir, write_json
 from . import settings
 from .fab_install import copy_into_place
 from .i18n import tr
@@ -193,10 +193,7 @@ class Downloads:
         """Offene Auftraege sichern (ohne Protokoll) - Aufruf nur mit gehaltenem Lock."""
         keep = [{k: v for k, v in j.items() if k != "log"} for j in self._jobs if j["status"] in OPEN]
         try:
-            os.makedirs(DATA_DIR, exist_ok=True)
-            with open(JOBS_FILE + ".tmp", "w", encoding="utf-8") as f:
-                json.dump(keep, f)
-            os.replace(JOBS_FILE + ".tmp", JOBS_FILE)
+            write_json(JOBS_FILE, keep)
         except OSError:
             pass
 
@@ -554,7 +551,15 @@ class Downloads:
         elif m := RE_PRUNED.search(line):
             job["pruned"] = (int(m.group(1)), int(m.group(2)))
         elif m := RE_INSTALL_PATH.search(line):
-            job["installPath"] = m.group(1).strip()
+            path = m.group(1).strip()
+            if "installPath" not in job:
+                # Lag dort schon vorher etwas (z. B. ein kopiertes Spiel)? Dann loescht ein Abbruch den Ordner nie.
+                # Nur beim ersten Lauf pruefen - nach "Fortsetzen" liegen dort ja unsere eigenen Teildateien.
+                try:
+                    job["folderExisted"] = os.path.isdir(path) and any(os.scandir(path))
+                except OSError:
+                    job["folderExisted"] = True  # im Zweifel nichts loeschen
+            job["installPath"] = path
         elif RE_UP_TO_DATE.search(line):
             job["message"] = ("Fertig – Versionsstand aktualisiert, es musste nichts geladen werden."
                               if job["action"] == "update" else "Bereits aktuell – nichts zu tun.")
@@ -585,8 +590,8 @@ def _is_partial_install(job):
     in Legendarys noch in der Epic-Launcher-Installationsliste.
     """
     path, base = job.get("installPath"), job.get("basePath")
-    if not path or not base or not os.path.isdir(path):
-        return False
+    if not path or not base or not os.path.isdir(path) or job.get("folderExisted", True):
+        return False  # Ordner gab es schon vor dem Auftrag (oder unbekannt) -> nie loeschen
     path, base = os.path.normcase(os.path.abspath(path)), os.path.normcase(os.path.abspath(base))
     if path == base or os.path.commonpath([path, base]) != base:
         return False
@@ -597,7 +602,8 @@ def _is_partial_install(job):
     except (OSError, ValueError):
         return False  # im Zweifel nichts loeschen
     try:
-        with open(r"C:\ProgramData\Epic\UnrealEngineLauncher\LauncherInstalled.dat", encoding="utf-8") as f:
+        with open(os.path.join(os.environ.get("PROGRAMDATA", r"C:\ProgramData"), "Epic", "UnrealEngineLauncher",
+                               "LauncherInstalled.dat"), encoding="utf-8") as f:
             listed = {os.path.normcase(os.path.abspath(e["InstallLocation"]))
                       for e in json.load(f).get("InstallationList", [])}
         if path in listed:

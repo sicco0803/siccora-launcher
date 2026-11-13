@@ -7,6 +7,7 @@ werden Kataloginfos nur einmal je Eintrag geholt und dann dauerhaft gemerkt.
 import json
 import os
 import re
+import tempfile
 import threading
 import time
 import traceback
@@ -29,20 +30,49 @@ LIB_SCHEMA = 2  # hochzaehlen, wenn library.json neue Eintragsarten bekommt (2: 
 FAB_SCHEMA = 3  # hochzaehlen, wenn fab.json neue Felder bekommt -> Cache wird neu geladen
 
 
+def read_json(path, default):
+    """JSON lesen; fehlt die Datei oder ist sie kaputt -> default. Wird sie gerade ausgetauscht
+    (write_json), sperrt Windows sie fuer einen Augenblick - dann kurz warten statt default zu liefern,
+    sonst wuerde z. B. settings.save die Standardwerte zurueckschreiben."""
+    for attempt in range(20):
+        try:
+            with open(path, encoding="utf-8") as f:
+                return json.load(f)
+        except PermissionError:
+            time.sleep(0.02)
+        except (OSError, ValueError):
+            return default
+    return default
+
+
 def _load(name, default):
+    return read_json(os.path.join(DATA_DIR, name), default)
+
+
+def write_json(path, data, **dump_args):
+    """JSON sicher schreiben: erst in eine eigene Zwischendatei, dann austauschen. Jeder Aufruf hat
+    seine eigene Zwischendatei - zwei Hintergrundaufgaben koennen sich so nicht in die Quere kommen."""
+    folder = os.path.dirname(path)
+    os.makedirs(folder, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=folder, prefix=os.path.basename(path) + ".", suffix=".tmp")
     try:
-        with open(os.path.join(DATA_DIR, name), encoding="utf-8") as f:
-            return json.load(f)
-    except (OSError, ValueError):
-        return default
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(data, f, **dump_args)
+        for attempt in range(10):
+            try:
+                os.replace(tmp, path)
+                return
+            except PermissionError:  # Windows: liest gerade jemand die Datei, kurz warten
+                if attempt == 9:
+                    raise
+                time.sleep(0.05)
+    finally:
+        if os.path.exists(tmp):
+            os.remove(tmp)
 
 
 def _save(name, data):
-    os.makedirs(DATA_DIR, exist_ok=True)
-    tmp = os.path.join(DATA_DIR, name + ".tmp")
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(data, f)
-    os.replace(tmp, os.path.join(DATA_DIR, name))
+    write_json(os.path.join(DATA_DIR, name), data)
 
 
 def _image(key_images, *types):
@@ -114,6 +144,18 @@ class EpicService:
 
     def logout(self):
         with self._lock:
+            # auch bei Epic beenden - sonst bliebe die Anmeldung dort noch eine Weile gueltig
+            # (Legendarys eigenes invalidate_session nutzt ein nie gesetztes Feld - darum hier selbst)
+            try:
+                if self.core.lgd.userdata:
+                    self.core.login()  # abgelaufenes Token erst erneuern, sonst lehnt Epic das Beenden ab
+                token = (self.core.lgd.userdata or {}).get("access_token")
+                if token:
+                    egs = self.core.egs
+                    egs.session.delete(f"https://{egs._oauth_host}/account/api/oauth/sessions/kill/{token}",
+                                       headers={"Authorization": f"bearer {token}"}, timeout=10)
+            except Exception:  # offline o. ae.: lokal trotzdem abmelden
+                pass
             self.core.lgd.invalidate_userdata()
         for name in ("library.json", "fab.json"):
             try:
@@ -347,6 +389,7 @@ class EpicService:
     def _with_install_state(self, data):
         inst = self.installed()
         acks = _load("version_ack.json", {})
+        options = _load("options.json", {})  # von components.refresh_options im Hintergrund ermittelt
         for item in data["items"]:
             local = inst.get(item["appName"])
             item["installed"] = bool(local)
@@ -355,6 +398,9 @@ class EpicService:
             item["version"] = local["version"] if local else None
             item["updateAvailable"] = bool(local and item.get("latest") and local["version"] != item["latest"]
                                            and acks.get(item["appName"]) != item["latest"])
+            known = options.get(item["appName"]) or {}
+            # None = noch unbekannt (Button bleibt sichtbar); nur fuer die installierte Version gueltig
+            item["hasOptions"] = known.get("has") if local and known.get("version") == local["version"] else None
             if item["kind"] == "engine" and local:
                 item["plugins"] = sorted(n.split("_")[0] for n, v in inst.items()
                                          if v["path"] == local["path"] and n != item["appName"])
