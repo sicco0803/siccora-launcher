@@ -37,6 +37,9 @@ OutputDir=..\dist
 OutputBaseFilename=SiccoraLauncher-{#AppVersion}-Setup
 SetupIconFile=siccora.ico
 UninstallDisplayIcon={app}\{#AppExe}
+; Windows am Ende benachrichtigen, damit Desktop/Taskleiste ein neues Programmsymbol zeigen
+; (sonst bleibt nach einem Update das alte Symbol aus dem Icon-Zwischenspeicher stehen)
+ChangesAssociations=yes
 UninstallDisplayName={#AppName}
 Compression=lzma2/max
 SolidCompression=yes

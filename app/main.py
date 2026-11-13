@@ -30,7 +30,7 @@ from backend.vault import asset_updates, epic_cached, epic_vault_dirs
 
 # im fertigen Paket liegen ui/ usw. im Entpack-Ordner von PyInstaller
 HERE = getattr(sys, "_MEIPASS", None) or os.path.dirname(os.path.abspath(__file__))
-APP_VERSION = "1.0.6"
+APP_VERSION = "1.0.7"
 
 # Sprache fest in der Adresse: Fab ignoriert die Browsersprache und entscheidet sonst
 # selbst (bei Mike kam so eine fremde Sprache heraus); Fab: ?lang=de, Epic: /de/ bzw. /en-US/

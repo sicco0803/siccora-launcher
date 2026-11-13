@@ -249,7 +249,7 @@ function jobBadge(job) {
 function itemActions(i, extra = '', tile = false) {
   const app = esc(i.appName);
   const job = busy(i.appName);
-  if (job) return `<button class="btn ghost small" data-view-go="downloads">${esc(jobBadge(job))}</button>`;
+  if (job) return `<button class="btn ghost small" data-view-go="downloads" data-job-app="${app}">${esc(jobBadge(job))}</button>`;
   if (!i.installed) return `<button class="btn small" data-install="${app}">${esc(t('Installieren'))}</button>`;
   // in der Box sitzen Update (neben dem Namen) und Entfernen (X oben rechts) woanders
   return (i.updateAvailable && !tile ? `<button class="btn small" data-update="${app}">${esc(t('Update'))}</button>` : '') + extra +
@@ -717,6 +717,11 @@ async function pollDownloads() {
     const open = jobs.filter((j) => OPEN.includes(j.status));
     $('#dl-count').hidden = !open.length;
     if (state.dlcOpen && !$('#dlcdlg').hidden) openDlcs(state.dlcOpen);  // DLC-Fenster live halten
+    // Fortschritt auf Karten und Boxen live halten (sie werden nur beim Oeffnen der Seite gezeichnet)
+    document.querySelectorAll('[data-job-app]').forEach((el) => {
+      const job = busy(el.dataset.jobApp);
+      if (job) el.textContent = jobBadge(job);
+    });
     $('#dl-count').textContent = open.length;
     $('#dl-mini').hidden = !running;
     if (running) {
