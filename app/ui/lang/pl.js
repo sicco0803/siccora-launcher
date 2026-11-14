@@ -647,5 +647,8 @@ I18N.pl = {
   "Installieren nach": "Zainstaluj w",
   "Als Standard für künftige Installationen merken": "Zapamiętaj jako domyślny dla przyszłych instalacji",
   "{n} GB frei auf diesem Laufwerk": "{n} GB wolnego miejsca na tym dysku",
-  "{title} installieren": "Zainstaluj {title}"
+  "{title} installieren": "Zainstaluj {title}",
+  "Dieses Element ist auch im Epic Launcher eingetragen. Er übernimmt neu hinzugefügte Komponenten evtl. nicht – aktualisiere es danach nur noch über den Siccora Launcher, sonst könnte der Epic Launcher die neuen Komponenten wieder entfernen.": "Ten element jest też zarejestrowany w Epic Games Launcher. Może on nie przejąć nowo dodanych komponentów – odtąd aktualizuj go tylko przez Siccora Launcher, inaczej Epic Games Launcher może ponownie usunąć nowe komponenty.",
+  "Bitte schließe zuerst den Epic Launcher.\n\n„{title}“ ist auch im Epic Launcher eingetragen. Damit beide auf demselben Stand bleiben, muss er geschlossen sein: rechts unten im Infobereich auf das Epic-Symbol klicken und „Beenden“ wählen.": "Najpierw zamknij Epic Games Launcher.\n\n„{title}” jest też zarejestrowany w Epic Games Launcher. Aby oba pozostały zsynchronizowane, musi być zamknięty: kliknij ikonę Epic w obszarze powiadomień (prawy dolny róg) i wybierz „Zakończ”.",
+  "Erneut prüfen": "Sprawdź ponownie"
 };

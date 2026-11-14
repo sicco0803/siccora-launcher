@@ -661,6 +661,9 @@ const I18N = {
     'Als Standard für künftige Installationen merken': 'Remember as default for future installs',
     '{n} GB frei auf diesem Laufwerk': '{n} GB free on this drive',
     '{title} installieren': 'Install {title}',
+    'Dieses Element ist auch im Epic Launcher eingetragen. Er übernimmt neu hinzugefügte Komponenten evtl. nicht – aktualisiere es danach nur noch über den Siccora Launcher, sonst könnte der Epic Launcher die neuen Komponenten wieder entfernen.': 'This item is also registered in the Epic Games Launcher. It may not pick up newly added components – from now on, update it only through Siccora Launcher, otherwise the Epic Games Launcher could remove the new components again.',
+    'Bitte schließe zuerst den Epic Launcher.\n\n„{title}“ ist auch im Epic Launcher eingetragen. Damit beide auf demselben Stand bleiben, muss er geschlossen sein: rechts unten im Infobereich auf das Epic-Symbol klicken und „Beenden“ wählen.': 'Please close the Epic Games Launcher first.\n\n“{title}” is also registered in the Epic Games Launcher. To keep both in sync, it has to be closed: click the Epic icon in the notification area (bottom right) and choose “Exit”.',
+    'Erneut prüfen': 'Check again',
   },
 };
 

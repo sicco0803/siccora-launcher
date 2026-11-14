@@ -647,5 +647,8 @@ I18N.nl = {
   "Installieren nach": "Installeren in",
   "Als Standard für künftige Installationen merken": "Onthouden als standaard voor toekomstige installaties",
   "{n} GB frei auf diesem Laufwerk": "{n} GB vrij op deze schijf",
-  "{title} installieren": "{title} installeren"
+  "{title} installieren": "{title} installeren",
+  "Dieses Element ist auch im Epic Launcher eingetragen. Er übernimmt neu hinzugefügte Komponenten evtl. nicht – aktualisiere es danach nur noch über den Siccora Launcher, sonst könnte der Epic Launcher die neuen Komponenten wieder entfernen.": "Dit item staat ook in de Epic Games Launcher. Die neemt nieuw toegevoegde onderdelen mogelijk niet over – werk het voortaan alleen via Siccora Launcher bij, anders kan de Epic Games Launcher de nieuwe onderdelen weer verwijderen.",
+  "Bitte schließe zuerst den Epic Launcher.\n\n„{title}“ ist auch im Epic Launcher eingetragen. Damit beide auf demselben Stand bleiben, muss er geschlossen sein: rechts unten im Infobereich auf das Epic-Symbol klicken und „Beenden“ wählen.": "Sluit eerst de Epic Games Launcher.\n\n„{title}” staat ook in de Epic Games Launcher. Om beide gelijk te houden moet die gesloten zijn: klik op het Epic-pictogram in het systeemvak (rechtsonder) en kies „Afsluiten”.",
+  "Erneut prüfen": "Opnieuw controleren"
 };

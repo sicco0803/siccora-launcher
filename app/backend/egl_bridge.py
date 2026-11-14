@@ -16,8 +16,10 @@ import time
 
 try:  # im Paket (entry.py) als backend-Modul, in der Entwicklung als Skript
     from . import lgd_run  # noqa: F401 - Einzelabruf statt Gesamt-Metadaten, Engines erlaubt
+    from . import egl_sync
 except ImportError:
     import lgd_run  # noqa: F401
+    import egl_sync
 from legendary.core import LegendaryCore
 
 
@@ -203,8 +205,14 @@ def main():
             return code
     elif action == "import":
         if core.is_installed(app):
-            print(f"{app} ist bereits uebernommen")
-            return 0
+            ig = core.get_installed_game(app)
+            if not egl_sync.egl_is_newer(app, ig.version, ig.install_path, core.lgd.path):
+                print(f"{app} ist bereits uebernommen")
+                return 0
+            # im Epic Launcher inzwischen aktualisiert/geaendert: dessen Stand neu uebernehmen
+            # (nur unsere Verwaltungsdaten - Dateien bleiben unberuehrt)
+            print("Der Epic Launcher hat einen neueren Stand - uebernehme ihn neu")
+            core.lgd.remove_installed_game(app)
         core.get_assets(update_assets=True)
         core.egl.read_manifests()
         core.egl_import(app)
@@ -219,8 +227,15 @@ def main():
         if not core.is_installed(app):
             print(f"{app} ist nicht ueber Legendary installiert - nichts zurueckzumelden")
             return 0
+        if egl_sync.egl_running():
+            # er wuerde unseren Eintrag beim Beenden mit seinem alten Stand ueberschreiben
+            print("EGL_BUSY Epic Launcher laeuft - Meldung folgt, sobald er geschlossen ist")
+            return 0
+        previous = egl_sync.snapshot(app)  # Legendarys Export ueberschreibt die Komponenten
         core.get_game(app, update_meta=True)
         core.egl_export(app)
+        ig = core.get_installed_game(app)
+        egl_sync.finish_export(app, ig.version, ig.install_path, ig.install_tags or [], previous)
     elif action == "verify":
         if not core.is_installed(app):
             print(f"ERROR: {app} ist nicht installiert")

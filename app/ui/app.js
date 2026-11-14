@@ -22,6 +22,7 @@ const OPEN = ['queued', 'running', 'paused'];
 let jobs = [];
 
 function toast(msg) {
+  if (!msg) return;  // z. B. vom Nutzer abgebrochen - nichts zu melden
   const el = $('#toast');
   el.textContent = msg;
   el.hidden = false;
@@ -85,7 +86,14 @@ window.addEventListener('error', (e) => reportUiError('error', `${e.message} @ $
 window.addEventListener('unhandledrejection', (e) => reportUiError('promise', e.reason?.stack || e.reason));
 
 async function call(name, ...args) {
-  const res = await api[name](...args);
+  let res = await api[name](...args);
+  // Installation, die auch der Epic Launcher fuehrt: erst arbeiten, wenn er geschlossen ist -
+  // sonst arbeiten beide mit unterschiedlichem Stand an denselben Dateien
+  while (res && res.eglRunning) {
+    if (!(await askConfirm(t('Bitte schließe zuerst den Epic Launcher.\n\n„{title}“ ist auch im Epic Launcher eingetragen. Damit beide auf demselben Stand bleiben, muss er geschlossen sein: rechts unten im Infobereich auf das Epic-Symbol klicken und „Beenden“ wählen.',
+      { title: res.title || '' }), { ok: 'Erneut prüfen' }))) throw new Error('');
+    res = await api[name](...args);
+  }
   if (res && res.error) throw new Error(res.error);
   return res;
 }
@@ -878,7 +886,9 @@ function renderOptSummary() {
     <span>${esc(t('Wird frei'))}</span><strong>${bytes(s.freed)}${s.files ? ` · ${esc(t('{n} Dateien', { n: s.files }))}` : ''}</strong>
     <span>${esc(t('Benötigter Speicher'))}</span><strong>${bytes(s.required)}</strong>
     <span>${esc(t('Frei auf dem Laufwerk'))}</span><strong>${bytes(optDlg.data.freeSpace)}</strong>`;
-  $('#opt-note').innerHTML = (s.added.length && item?.updateAvailable
+  $('#opt-note').innerHTML = (s.added.length && item?.inEgl
+    ? `<p class="note bad">${esc(t('Dieses Element ist auch im Epic Launcher eingetragen. Er übernimmt neu hinzugefügte Komponenten evtl. nicht – aktualisiere es danach nur noch über den Siccora Launcher, sonst könnte der Epic Launcher die neuen Komponenten wieder entfernen.'))}</p>` : '') +
+    (s.added.length && item?.updateAvailable
     ? `<p class="note">${esc(t('Für dieses Element steht ein Update aus – es wird beim Hinzufügen mit installiert.'))}</p>` : '') +
     (s.sharedFiles ? `<p class="note">${esc(t('{n} Dateien ({size}) bleiben stehen, weil weiterhin gewählte Komponenten sie mitbenutzen – der Ordner der abgewählten Komponente verschwindet deshalb evtl. nicht ganz.',
       { n: s.sharedFiles, size: bytes(s.sharedSize) }))}</p>` : '');

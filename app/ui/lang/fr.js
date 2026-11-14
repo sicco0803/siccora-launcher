@@ -647,5 +647,8 @@ I18N.fr = {
   "Installieren nach": "Installer dans",
   "Als Standard für künftige Installationen merken": "Mémoriser comme dossier par défaut pour les prochaines installations",
   "{n} GB frei auf diesem Laufwerk": "{n} Go libres sur ce disque",
-  "{title} installieren": "Installer {title}"
+  "{title} installieren": "Installer {title}",
+  "Dieses Element ist auch im Epic Launcher eingetragen. Er übernimmt neu hinzugefügte Komponenten evtl. nicht – aktualisiere es danach nur noch über den Siccora Launcher, sonst könnte der Epic Launcher die neuen Komponenten wieder entfernen.": "Cet élément est aussi enregistré dans l’Epic Games Launcher. Il risque de ne pas reprendre les composants ajoutés – mettez-le ensuite à jour uniquement via Siccora Launcher, sinon l’Epic Games Launcher pourrait de nouveau supprimer les nouveaux composants.",
+  "Bitte schließe zuerst den Epic Launcher.\n\n„{title}“ ist auch im Epic Launcher eingetragen. Damit beide auf demselben Stand bleiben, muss er geschlossen sein: rechts unten im Infobereich auf das Epic-Symbol klicken und „Beenden“ wählen.": "Veuillez d’abord fermer l’Epic Games Launcher.\n\n« {title} » est aussi enregistré dans l’Epic Games Launcher. Pour que les deux restent synchronisés, il doit être fermé : cliquez sur l’icône Epic dans la zone de notification (en bas à droite) et choisissez « Quitter ».",
+  "Erneut prüfen": "Vérifier à nouveau"
 };

@@ -231,7 +231,9 @@ class EpicService:
             if egl and egl["version"] != ig["version"] and _same_dir(egl["path"], ig["install_path"]) \
                     and egl_time.get(app, 0) > _legendary_time(lgd_dir, app, ig["version"]):
                 continue
-            result[app] = {"path": ig["install_path"], "version": ig["version"], "source": "legendary"}
+            # inEgl: der Epic Launcher fuehrt dieselbe Installation ebenfalls (fuer Hinweise in der Oberflaeche)
+            result[app] = {"path": ig["install_path"], "version": ig["version"], "source": "legendary",
+                           "inEgl": bool(egl and _same_dir(egl["path"], ig["install_path"]))}
         return result
 
     def heroic_installed(self):
@@ -440,6 +442,7 @@ class EpicService:
             local = inst.get(item["appName"])
             item["installed"] = bool(local)
             item["source"] = local["source"] if local else None
+            item["inEgl"] = bool(local) and (local["source"] == "egl" or local.get("inEgl", False))
             item["path"] = local["path"] if local else None
             item["version"] = local["version"] if local else None
             item["updateAvailable"] = bool(local and item.get("latest") and local["version"] != item["latest"]

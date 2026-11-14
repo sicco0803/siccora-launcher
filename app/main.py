@@ -18,7 +18,7 @@ import webview
 
 from backend import autostart, cleanup, components, crashes, debuglog, freefab, launch, projects, selfupdate, settings
 from backend.tray import Tray
-from backend.downloads import Downloads, hide_servers
+from backend.downloads import Downloads, egl_pending_flush, egl_startup_check, hide_servers
 from backend.epic import DATA_DIR, LOGIN_URL, EpicService
 from backend.storepanel import StorePanel, guard_main
 from backend.fab_install import KINDS, compatibility, read_project
@@ -30,7 +30,7 @@ from backend.vault import asset_updates, epic_cached, epic_vault_dirs
 
 # im fertigen Paket liegen ui/ usw. im Entpack-Ordner von PyInstaller
 HERE = getattr(sys, "_MEIPASS", None) or os.path.dirname(os.path.abspath(__file__))
-APP_VERSION = "1.0.8"
+APP_VERSION = "1.0.9"
 
 # Sprache fest in der Adresse: Fab ignoriert die Browsersprache und entscheidet sonst
 # selbst (bei Mike kam so eine fremde Sprache heraus); Fab: ?lang=de, Epic: /de/ bzw. /en-US/
@@ -240,6 +240,9 @@ class Api:
 
     @_safe
     def modify_components(self, app_name, selected):
+        busy = self._egl_busy(app_name)
+        if busy:
+            return busy
         # Grundlage ist genau die Analyse, deren Zahlen der Nutzer gesehen hat (max. 30 Min. alt)
         cached = self._components.get(app_name)
         if not cached or time.time() - cached[0] > 1800:
@@ -531,6 +534,9 @@ class Api:
             parent = self._epic.installed().get(item["parent"])
             if not parent:
                 return {"error": tr("Bitte zuerst das Spiel installieren.")}
+            busy = self._egl_busy(item["parent"])
+            if busy:
+                return busy
             return self._downloads.add("install", app_name, item["title"], parent_from_egl=parent["source"] == "egl",
                                        parent=item["parent"])
         if base_dir:
@@ -636,16 +642,31 @@ class Api:
             return {"error": tr("Dieser Ordner gehört schon zu {title}.", title=names[0] if names else users[0])}
         return self._downloads.add("adopt", app_name, item["title"], base_path=folder)
 
+    def _egl_busy(self, app_name):
+        """Fuehrt auch der Epic Launcher diese Installation, und laeuft er gerade? Dann erst nach dem
+        Schliessen arbeiten - sonst gleicht er mit seinem alten Stand ab (Vorfall 14.11.2026)."""
+        local = self._epic.installed().get(app_name)
+        if not local or not (local["source"] == "egl" or local.get("inEgl")):
+            return None
+        from backend.egl_sync import egl_running
+        if not egl_running():
+            return None
+        item = self._epic.find(app_name)
+        return {"eglRunning": True, "title": item["title"] if item else app_name}
+
     @_safe
     def update(self, app_name):
-        return self._queue_existing("update", app_name)
+        return self._egl_busy(app_name) or self._queue_existing("update", app_name)
 
     @_safe
     def repair(self, app_name):
-        return self._queue_existing("repair", app_name)
+        return self._egl_busy(app_name) or self._queue_existing("repair", app_name)
 
     @_safe
     def uninstall(self, app_name):
+        busy = self._egl_busy(app_name)
+        if busy:
+            return busy
         # erst die DLCs des Spiels sauber austragen (sie liegen in seinem Ordner)
         installed = self._epic.installed()
         for d in self._dlcs_of(app_name):
@@ -952,6 +973,16 @@ def main(selftest=None):
             traceback.print_exc()  # ohne Symbol weiter - das X beendet dann normal
         # einmal nach dem Start: wo gibt es ueberhaupt "Optionen"? (nur fuer neue/aktualisierte Versionen)
         threading.Thread(target=lambda: _quiet(components.refresh_options, api._epic), daemon=True).start()
+        # Meldungen an den Epic Launcher nachholen, die warten mussten, weil er offen war
+        def egl_sync_loop():
+            from backend import egl_sync
+            _quiet(egl_sync.remember_all)  # Auswahl des Epic Launchers merken, bevor seine Protokolle verschwinden
+            _quiet(egl_startup_check)  # falsche Eintraege beim Epic Launcher (aeltere Versionen) richtigstellen
+            while True:
+                if not api._downloads.active():
+                    _quiet(egl_pending_flush)
+                time.sleep(60)
+        threading.Thread(target=egl_sync_loop, daemon=True).start()
         if selftest:
             _selftest(window, selftest)()
 

@@ -647,5 +647,8 @@ I18N.it = {
   "Installieren nach": "Installa in",
   "Als Standard für künftige Installationen merken": "Ricorda come predefinita per le prossime installazioni",
   "{n} GB frei auf diesem Laufwerk": "{n} GB liberi su questa unità",
-  "{title} installieren": "Installa {title}"
+  "{title} installieren": "Installa {title}",
+  "Dieses Element ist auch im Epic Launcher eingetragen. Er übernimmt neu hinzugefügte Komponenten evtl. nicht – aktualisiere es danach nur noch über den Siccora Launcher, sonst könnte der Epic Launcher die neuen Komponenten wieder entfernen.": "Questo elemento è registrato anche nell’Epic Games Launcher. Potrebbe non riconoscere i componenti aggiunti: da ora aggiornalo solo tramite Siccora Launcher, altrimenti l’Epic Games Launcher potrebbe rimuovere di nuovo i nuovi componenti.",
+  "Bitte schließe zuerst den Epic Launcher.\n\n„{title}“ ist auch im Epic Launcher eingetragen. Damit beide auf demselben Stand bleiben, muss er geschlossen sein: rechts unten im Infobereich auf das Epic-Symbol klicken und „Beenden“ wählen.": "Chiudi prima l’Epic Games Launcher.\n\n«{title}» è registrato anche nell’Epic Games Launcher. Per mantenere entrambi allineati deve essere chiuso: fai clic sull’icona Epic nell’area di notifica (in basso a destra) e scegli «Esci».",
+  "Erneut prüfen": "Controlla di nuovo"
 };

@@ -300,8 +300,7 @@ class Downloads:
             if ok and job["status"] == "running" and job["action"] in ("install", "update") and settings.get("verifyAfter"):
                 ok = self._verify_after(job, app)
             if ok and job["status"] == "running":
-                job["message"] = "Melde Stand an den Epic Launcher …"
-                self._exec(job, BRIDGE + ["export", app])  # nicht kritisch
+                self._export_to_egl(job, app)
 
         if self._stopped(job):
             return
@@ -417,8 +416,7 @@ class Downloads:
             if not self._exec(job, BRIDGE + ["prune", app, ",".join(comp["removed"])]):
                 return None if self._stopped(job) else self._fail(job, "Entfernen der Komponenten fehlgeschlagen.")
 
-        job["message"] = "Melde Stand an den Epic Launcher …"
-        self._exec(job, BRIDGE + ["export", app])  # nicht kritisch
+        self._export_to_egl(job, app)
         if self._stopped(job):
             return
         job["status"], job["progress"] = "done", 100.0
@@ -469,6 +467,15 @@ class Downloads:
             self._fail(job, "Fehlerhafte Dateien konnten nicht neu geladen werden – bitte „Prüfen“ ausführen.")
         return ok
 
+    def _export_to_egl(self, job, app):
+        """Neuen Stand an den Epic Launcher melden (nicht kritisch). Laeuft er gerade, wird die
+        Meldung vorgemerkt und nachgeholt, sobald er geschlossen ist (egl_pending)."""
+        job["message"] = "Melde Stand an den Epic Launcher …"
+        job.pop("eglBusy", None)
+        self._exec(job, BRIDGE + ["export", app])
+        if job.get("eglBusy"):
+            egl_pending_add(app)
+
     def _exec(self, job, cmd, extra_env=None):
         env = dict(os.environ, PYTHONUNBUFFERED="1", PYTHONIOENCODING="utf-8", SICCORA_SETTINGS=settings.PATH,
                    SICCORA_WORKERS=str(_connections()), **(extra_env or {}))
@@ -480,8 +487,15 @@ class Downloads:
                 creationflags=NO_WINDOW, text=True, encoding="utf-8", errors="replace")
         began = time.time()
         debuglog.job_line(job, f">>> {' '.join(os.path.basename(c) if os.path.isabs(c) else c for c in cmd)}")
+        quiet = 0.0
         for line in proc.stdout:
-            debuglog.job_line(job, line.rstrip())
+            # Fortschrittszeilen nur alle 2 s ins Protokoll (bei DevKits sonst ueber 100 MB)
+            if line.startswith("Verification progress") or "[DLManager] INFO:" in line and "Progress:" not in line:
+                if time.time() - quiet >= 2:
+                    quiet = time.time()
+                    debuglog.job_line(job, line.rstrip())
+            else:
+                debuglog.job_line(job, line.rstrip())
             self._parse(job, line.rstrip())
         code = proc.wait()
         debuglog.job_line(job, f"<<< beendet mit {code} nach {time.time() - began:.1f}s, Status {job['status']}")
@@ -493,6 +507,8 @@ class Downloads:
     def _parse(job, line):
         if not line.strip():
             return
+        if line.startswith("EGL_BUSY"):
+            job["eglBusy"] = True
         log = job["log"]
         shown = hide_servers(line)  # nur die Anzeige - ausgewertet wird weiter die Originalzeile
         if m := RE_VERIFY.search(line):
@@ -611,6 +627,54 @@ def _is_partial_install(job):
     except (OSError, ValueError):
         pass
     return True
+
+
+# --- Meldungen an den Epic Launcher, die warten muessen, bis er geschlossen ist ---------------
+EGL_PENDING = "egl_pending.json"
+
+
+def egl_pending_add(app):
+    from .epic import _load, _save
+    pending = _load(EGL_PENDING, [])
+    if app not in pending:
+        _save(EGL_PENDING, pending + [app])
+
+
+def egl_startup_check():
+    """Einmal beim Start: Installationen, die der Epic Launcher mit falschem Stand fuehrt (z. B. von
+    einer aelteren Launcher-Version), zur Meldung vormerken - egl_pending_flush erledigt den Rest."""
+    from .egl_sync import needs_sync
+    try:
+        with open(os.path.join(legendary_dir(), "installed.json"), encoding="utf-8") as f:
+            own = json.load(f)
+    except (OSError, ValueError):
+        return []
+    found = [app for app, ig in own.items()
+             if needs_sync(app, ig.get("version") or "", ig.get("install_path") or "", ig.get("install_tags") or [], legendary_dir())]
+    for app in found:
+        egl_pending_add(app)
+    if found:
+        debuglog.log("egl", "Abgleich beim Start vorgemerkt", apps=found)
+    return found
+
+
+def egl_pending_flush():
+    """Vorgemerkte Meldungen nachholen (Aufruf im Hintergrund). Liefert die erledigten Apps."""
+    from .epic import _load, _save
+    from .egl_sync import egl_running
+    pending = _load(EGL_PENDING, [])
+    if not pending or egl_running():
+        return []
+    done = []
+    for app in pending:
+        out = subprocess.run(BRIDGE + ["export", app], capture_output=True, text=True, errors="replace",
+                             env=dict(os.environ, PYTHONUNBUFFERED="1", PYTHONIOENCODING="utf-8"),
+                             creationflags=NO_WINDOW, timeout=600)
+        debuglog.log("egl", "Nachgeholte Meldung", app=app, code=out.returncode, text=out.stdout[-500:])
+        if out.returncode == 0 and "EGL_BUSY" not in out.stdout:
+            done.append(app)
+    _save(EGL_PENDING, [a for a in _load(EGL_PENDING, []) if a not in done])
+    return done
 
 
 def _vault(job):
