@@ -1213,21 +1213,60 @@ async function openAdd(kind) {
     <label class="field"><span>${esc(t(kind === 'engine' ? 'Unreal-Engine-Version' : 'DevKit oder Tool'))}</span>
       <select id="add-app">${kind === 'engine' ? options(items) : `<optgroup label="${esc(t('DevKits'))}">${options(devkits)}</optgroup>
         ${others.length ? `<optgroup label="${esc(t('Sonstige Software'))}">${options(others)}</optgroup>` : ''}`}</select></label>
-    <div class="field"><span>${esc(t('Installationsordner'))}</span><div class="pick">
-      <code>${esc(s.installDir || t('noch nicht festgelegt'))}</code>
-      <button class="btn ghost small" id="add-dir">${esc(t('Ändern'))}</button></div></div>`
+    ${installTargetHtml()}`
     : `<p class="home-empty">${esc(t(`Alle verfügbaren ${what}s sind installiert.`))}</p>`;
   $('#add-go').hidden = !items.length;
   $('#add-go').textContent = t('Installieren');
   state.adopt = null;
+  state.installApp = null;  // App kommt aus der Auswahlliste
   $('#adddlg').hidden = false;
-  const dir = $('#add-dir');
-  if (dir) dir.onclick = async () => { if (!(await call('choose_install_dir')).cancelled) openAdd(kind); };
+  if (items.length) wireInstallTarget(s);
+}
+
+// --- Zielordner einer Installation: Standard aus den Einstellungen, auf Wunsch nur diesmal ein anderer ---
+function installTargetHtml() {
+  return `<div class="field"><span>${esc(t('Installieren nach'))}</span><div class="pick">
+      <code id="inst-dir"></code>
+      <button class="btn ghost small" id="inst-change">${esc(t('Ändern'))}</button></div>
+      <small class="inst-free" id="inst-free"></small></div>
+    <label class="check"><input type="checkbox" id="inst-remember"> ${esc(t('Als Standard für künftige Installationen merken'))}</label>`;
+}
+
+function wireInstallTarget(s) {
+  // noch kein Standard festgelegt: der gewaehlte Ordner wird es automatisch
+  state.install = { dir: s.installDir || null, remember: !s.installDir };
+  const paint = async () => {
+    $('#inst-dir').textContent = state.install.dir || t('noch nicht festgelegt');
+    $('#inst-remember').checked = state.install.remember;
+    $('#inst-free').textContent = '';
+    if (!state.install.dir) return;
+    const free = (await call('disk_free', state.install.dir)).freeGb;
+    if (free != null && $('#inst-free')) $('#inst-free').textContent = t('{n} GB frei auf diesem Laufwerk', { n: free });
+  };
+  $('#inst-change').onclick = async () => {
+    const p = await call('choose_folder');
+    if (!p.cancelled) { state.install.dir = p.path; paint(); }
+  };
+  $('#inst-remember').onchange = (e) => { state.install.remember = e.target.checked; };
+  paint();
+}
+
+// Spiele: dasselbe Fenster, nur ohne Auswahlliste
+async function openInstall(item) {
+  const s = await call('settings');
+  $('#add-heading').textContent = t('{title} installieren', { title: item.title });
+  $('#add-body').innerHTML = installTargetHtml();
+  $('#add-go').hidden = false;
+  $('#add-go').textContent = t('Installieren');
+  state.adopt = null;
+  state.installApp = item.appName;
+  $('#adddlg').hidden = false;
+  wireInstallTarget(s);
 }
 
 $('#add-close').onclick = () => ($('#adddlg').hidden = true);
 $('#add-go').onclick = async () => {
-  const app = $('#add-app').value;
+  const app = $('#add-app')?.value;
   if (state.adopt) {
     if (!state.adopt.path) { toast(t('Bitte zuerst den Ordner wählen.')); return; }
     try {
@@ -1238,8 +1277,9 @@ $('#add-go').onclick = async () => {
     } catch (err) { toast(err.message); }
     return;
   }
+  if (!state.install?.dir) { toast(t('Bitte zuerst den Ordner wählen.')); return; }
   $('#adddlg').hidden = true;
-  try { await startInstall(app); } catch (err) { toast(err.message); }
+  try { await startInstall(state.installApp || app, state.install); } catch (err) { toast(err.message); }
 };
 
 // Vorhandene Engine oder vorhandenes DevKit uebernehmen (z. B. aus Heroic), ohne neuen Download
@@ -1273,10 +1313,11 @@ async function openAdopt(kind) {
   };
 }
 
-async function startInstall(appName) {
+async function startInstall(appName, target) {
   const item = state.library?.items.find((i) => i.appName === appName);
+  if (!target && item && item.kind !== 'dlc') { await openInstall(item); return; }  // erst den Zielordner zeigen
   if (item?.preview && !(await askConfirm(t('{title} installieren?\n\nDas ist eine Vorabversion von Epic: Sie kann Fehler enthalten und ändert sich bis zur fertigen Version noch. Für echte Projekte besser nicht verwenden.', { title: item.title }), { ok: 'Trotzdem installieren' }))) return;
-  let res = await call('install', appName);
+  let res = await call('install', appName, target?.dir || null, !!target?.remember);
   if (res.needsInstallDir) {
     toast(t('Wähle zuerst den Ordner, in den installiert werden soll.'));
     const s = await call('choose_install_dir');

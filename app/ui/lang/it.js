@@ -643,5 +643,9 @@ I18N.it = {
   "Prüfe installierte Komponenten auf der Platte …": "Verifica dei componenti installati sul disco …",
   "Vergleiche alte und neue Version …": "Confronto tra vecchia e nuova versione …",
   "Bei großen DevKits dauert das etwas – ihre Dateilisten haben über eine Million Einträge.": "Per i DevKit grandi ci vuole un po’: i loro elenchi di file hanno oltre un milione di voci.",
-  "Wird entfernt …": "Rimozione …"
+  "Wird entfernt …": "Rimozione …",
+  "Installieren nach": "Installa in",
+  "Als Standard für künftige Installationen merken": "Ricorda come predefinita per le prossime installazioni",
+  "{n} GB frei auf diesem Laufwerk": "{n} GB liberi su questa unità",
+  "{title} installieren": "Installa {title}"
 };

@@ -643,5 +643,9 @@ I18N.fr = {
   "Prüfe installierte Komponenten auf der Platte …": "Vérification des composants installés sur le disque …",
   "Vergleiche alte und neue Version …": "Comparaison de l’ancienne et de la nouvelle version …",
   "Bei großen DevKits dauert das etwas – ihre Dateilisten haben über eine Million Einträge.": "Pour les gros DevKits, cela prend un moment – leurs listes de fichiers comptent plus d’un million d’entrées.",
-  "Wird entfernt …": "Suppression …"
+  "Wird entfernt …": "Suppression …",
+  "Installieren nach": "Installer dans",
+  "Als Standard für künftige Installationen merken": "Mémoriser comme dossier par défaut pour les prochaines installations",
+  "{n} GB frei auf diesem Laufwerk": "{n} Go libres sur ce disque",
+  "{title} installieren": "Installer {title}"
 };

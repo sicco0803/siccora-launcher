@@ -643,5 +643,9 @@ I18N.es = {
   "Prüfe installierte Komponenten auf der Platte …": "Comprobando los componentes instalados en el disco …",
   "Vergleiche alte und neue Version …": "Comparando la versión antigua y la nueva …",
   "Bei großen DevKits dauert das etwas – ihre Dateilisten haben über eine Million Einträge.": "En DevKits grandes tarda un poco: sus listas de archivos tienen más de un millón de entradas.",
-  "Wird entfernt …": "Eliminando …"
+  "Wird entfernt …": "Eliminando …",
+  "Installieren nach": "Instalar en",
+  "Als Standard für künftige Installationen merken": "Recordar como predeterminada para futuras instalaciones",
+  "{n} GB frei auf diesem Laufwerk": "{n} GB libres en esta unidad",
+  "{title} installieren": "Instalar {title}"
 };

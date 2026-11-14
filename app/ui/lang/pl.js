@@ -643,5 +643,9 @@ I18N.pl = {
   "Prüfe installierte Komponenten auf der Platte …": "Sprawdzanie zainstalowanych komponentów na dysku …",
   "Vergleiche alte und neue Version …": "Porównywanie starej i nowej wersji …",
   "Bei großen DevKits dauert das etwas – ihre Dateilisten haben über eine Million Einträge.": "Przy dużych DevKitach to chwilę trwa – ich listy plików mają ponad milion pozycji.",
-  "Wird entfernt …": "Usuwanie …"
+  "Wird entfernt …": "Usuwanie …",
+  "Installieren nach": "Zainstaluj w",
+  "Als Standard für künftige Installationen merken": "Zapamiętaj jako domyślny dla przyszłych instalacji",
+  "{n} GB frei auf diesem Laufwerk": "{n} GB wolnego miejsca na tym dysku",
+  "{title} installieren": "Zainstaluj {title}"
 };

@@ -56,7 +56,7 @@ def _write(data):
     write_json(PATH, {k: v for k, v in data.items() if k in DEFAULTS}, indent=1)
 
 
-def _local_dir(path):
+def local_dir(path):
     return bool(path) and not path.startswith(("\\\\", "//")) and os.path.isdir(path)
 
 
@@ -88,7 +88,7 @@ def save(changes):
         elif key in ("installDir", "vaultDir"):
             if value is None:  # zuruecksetzen auf Standard
                 value = DEFAULTS[key]
-            elif not _local_dir(value):
+            elif not local_dir(value):
                 return {"error": tr("Ordner existiert nicht oder ist ein Netzwerkpfad.")}
             elif key == "vaultDir" and _is_epic_vault(value):
                 return {"error": tr("Das ist der Vault-Cache des Epic Launchers – bitte einen eigenen Ordner wählen.")}

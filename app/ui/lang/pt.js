@@ -643,5 +643,9 @@ I18N.pt = {
   "Prüfe installierte Komponenten auf der Platte …": "A verificar os componentes instalados no disco …",
   "Vergleiche alte und neue Version …": "A comparar a versão antiga e a nova …",
   "Bei großen DevKits dauert das etwas – ihre Dateilisten haben über eine Million Einträge.": "Em DevKits grandes isto demora um pouco – as listas de ficheiros têm mais de um milhão de entradas.",
-  "Wird entfernt …": "A remover …"
+  "Wird entfernt …": "A remover …",
+  "Installieren nach": "Instalar em",
+  "Als Standard für künftige Installationen merken": "Memorizar como predefinida para futuras instalações",
+  "{n} GB frei auf diesem Laufwerk": "{n} GB livres nesta unidade",
+  "{title} installieren": "Instalar {title}"
 };

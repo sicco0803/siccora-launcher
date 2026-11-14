@@ -4,6 +4,7 @@ Alles, was teuer abzurufen ist, wird in %LOCALAPPDATA%\\SiccoraLauncher
 zwischengespeichert. Epic reagiert auf viele Anfragen mit HTTP 429, darum
 werden Kataloginfos nur einmal je Eintrag geholt und dann dauerhaft gemerkt.
 """
+import glob
 import json
 import os
 import re
@@ -19,7 +20,35 @@ from . import debuglog
 from .i18n import tr
 
 DATA_DIR = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")), "SiccoraLauncher")
-EGL_INSTALLED = r"C:\ProgramData\Epic\UnrealEngineLauncher\LauncherInstalled.dat"
+_PROGRAMDATA = os.environ.get("PROGRAMDATA", r"C:\ProgramData")
+EGL_INSTALLED = os.path.join(_PROGRAMDATA, "Epic", "UnrealEngineLauncher", "LauncherInstalled.dat")
+EGL_ITEMS = os.path.join(_PROGRAMDATA, "Epic", "EpicGamesLauncher", "Data", "Manifests")
+
+
+def _egl_items():
+    """Die Einzel-Eintraege des Epic Launchers (.item): {appName: (Version, Ordner, Zeitpunkt)}.
+    Genauer als LauncherInstalled.dat - dort bleibt die Version nach einem Update manchmal alt stehen."""
+    found = {}
+    for path in glob.glob(os.path.join(EGL_ITEMS, "*.item")):
+        try:
+            with open(path, encoding="utf-8") as f:
+                data = json.load(f)
+            found[data["AppName"]] = (data.get("AppVersionString"), data.get("InstallLocation") or "",
+                                      os.path.getmtime(path))
+        except (OSError, ValueError, KeyError, TypeError):
+            continue
+    return found
+
+
+def _same_dir(a, b):
+    return os.path.normcase(os.path.abspath(a or "")) == os.path.normcase(os.path.abspath(b or ""))
+
+
+def _legendary_time(lgd_dir, app, version):
+    """Wann Legendary diese Version eingetragen hat: ihre Dateiliste wird dabei gespeichert."""
+    pattern = os.path.join(lgd_dir, "manifests", f"{glob.escape(app)}_*_{glob.escape(version)}.manifest")
+    found = glob.glob(pattern) + glob.glob(os.path.join(lgd_dir, "manifests", f"{glob.escape(app)}.manifest"))
+    return max((os.path.getmtime(f) for f in found), default=0)
 LOGIN_URL = "https://legendary.gl/epiclogin"
 
 UE_NS = "ue"
@@ -176,15 +205,32 @@ class EpicService:
                 entries = json.load(f).get("InstallationList", [])
         except (OSError, ValueError):
             entries = []
-        result = {e["AppName"]: {"path": e["InstallLocation"], "version": e["AppVersion"], "source": "egl"}
-                  for e in entries if os.path.isdir(e["InstallLocation"])}
+        items = _egl_items()
+        result, egl_time = {}, {}
+        for e in entries:
+            if not os.path.isdir(e["InstallLocation"]):
+                continue
+            version, item_dir, changed = items.get(e["AppName"], (None, None, 0))
+            # die .item-Datei wird bei jedem Update geschrieben - ihre Version gilt, wenn sie zum Ordner passt
+            if version and _same_dir(item_dir, e["InstallLocation"]):
+                e = {**e, "AppVersion": version}
+            result[e["AppName"]] = {"path": e["InstallLocation"], "version": e["AppVersion"], "source": "egl"}
+            egl_time[e["AppName"]] = changed
         # direkt lesen: die Download-Prozesse schreiben die Datei, unser Core-Objekt merkt das nicht
+        lgd_dir = self.core.lgd.path
         try:
-            with open(os.path.join(self.core.lgd.path, "installed.json"), encoding="utf-8") as f:
+            with open(os.path.join(lgd_dir, "installed.json"), encoding="utf-8") as f:
                 own = json.load(f)
         except (OSError, ValueError):
             own = {}
         for app, ig in own.items():
+            egl = result.get(app)
+            # Steht die Installation in beiden Listen mit verschiedener Version (z. B. im Epic Launcher
+            # aktualisiert, nachdem sie einmal hier lief), gilt der neuere Eintrag - sonst bliebe nach
+            # einem Update im Epic Launcher die Update-Meldung hier stehen.
+            if egl and egl["version"] != ig["version"] and _same_dir(egl["path"], ig["install_path"]) \
+                    and egl_time.get(app, 0) > _legendary_time(lgd_dir, app, ig["version"]):
+                continue
             result[app] = {"path": ig["install_path"], "version": ig["version"], "source": "legendary"}
         return result
 

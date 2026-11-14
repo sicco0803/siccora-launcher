@@ -223,6 +223,7 @@ body.store-mode main { overflow: hidden; padding-bottom: 0; }
 .field .pick { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .field code { color: var(--ink); background: var(--surface); padding: 4px 8px; border: 1px solid var(--line-soft); word-break: break-all; }
 .check { display: flex; gap: 8px; align-items: center; color: var(--muted); margin-top: 8px; }
+.inst-free { color: var(--faint); font-size: 12px; }
 
 .opt-list { max-height: 46vh; overflow-y: auto; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 .opt-row { display: grid; grid-template-columns: 1fr auto auto; gap: 16px; align-items: center;

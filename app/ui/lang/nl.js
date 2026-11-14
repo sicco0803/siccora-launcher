@@ -643,5 +643,9 @@ I18N.nl = {
   "Prüfe installierte Komponenten auf der Platte …": "Geïnstalleerde onderdelen op de schijf controleren …",
   "Vergleiche alte und neue Version …": "Oude en nieuwe versie vergelijken …",
   "Bei großen DevKits dauert das etwas – ihre Dateilisten haben über eine Million Einträge.": "Bij grote DevKits duurt dit even – hun bestandslijsten hebben meer dan een miljoen items.",
-  "Wird entfernt …": "Wordt verwijderd …"
+  "Wird entfernt …": "Wordt verwijderd …",
+  "Installieren nach": "Installeren in",
+  "Als Standard für künftige Installationen merken": "Onthouden als standaard voor toekomstige installaties",
+  "{n} GB frei auf diesem Laufwerk": "{n} GB vrij op deze schijf",
+  "{title} installieren": "{title} installeren"
 };

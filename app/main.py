@@ -30,7 +30,7 @@ from backend.vault import asset_updates, epic_cached, epic_vault_dirs
 
 # im fertigen Paket liegen ui/ usw. im Entpack-Ordner von PyInstaller
 HERE = getattr(sys, "_MEIPASS", None) or os.path.dirname(os.path.abspath(__file__))
-APP_VERSION = "1.0.7"
+APP_VERSION = "1.0.8"
 
 # Sprache fest in der Adresse: Fab ignoriert die Browsersprache und entscheidet sonst
 # selbst (bei Mike kam so eine fremde Sprache heraus); Fab: ?lang=de, Epic: /de/ bzw. /en-US/
@@ -521,7 +521,9 @@ class Api:
         return settings.save({"installDir": picked[0]})
 
     @_safe
-    def install(self, app_name):
+    def install(self, app_name, base_dir=None, remember=False):
+        """base_dir: Ordner nur fuer diese Installation (sonst der Standard aus den Einstellungen);
+        remember: diesen Ordner ausserdem als neuen Standard speichern."""
         item = self._epic.find(app_name)
         if not item:
             return {"error": tr("Eintrag nicht in der Bibliothek gefunden.")}
@@ -531,10 +533,26 @@ class Api:
                 return {"error": tr("Bitte zuerst das Spiel installieren.")}
             return self._downloads.add("install", app_name, item["title"], parent_from_egl=parent["source"] == "egl",
                                        parent=item["parent"])
-        base = settings.get("installDir")
+        if base_dir:
+            if remember:  # prueft den Ordner gleich mit (lokal, vorhanden)
+                saved = settings.save({"installDir": base_dir})
+                if "error" in saved:
+                    return saved
+            elif not settings.local_dir(base_dir):
+                return {"error": tr("Ordner existiert nicht oder ist ein Netzwerkpfad.")}
+            base = os.path.abspath(base_dir)
+        else:
+            base = settings.get("installDir")
         if not base:
             return {"needsInstallDir": True}
         return self._downloads.add("install", app_name, item["title"], base_path=base)
+
+    @_safe
+    def disk_free(self, path):
+        """Freier Platz auf dem Laufwerk eines Ordners (fuer das Installieren-Fenster)."""
+        if not settings.local_dir(path):
+            return {"freeGb": None}
+        return {"freeGb": round(shutil.disk_usage(path).free / 1024 ** 3)}
 
     def _all_projects(self):
         """Eigene Projekte plus die Projekte in Engines und DevKits (z. B. Projects/ShooterGame)."""

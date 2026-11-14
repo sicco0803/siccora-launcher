@@ -657,6 +657,10 @@ const I18N = {
     'Vergleiche alte und neue Version …': 'Comparing old and new version …',
     'Bei großen DevKits dauert das etwas – ihre Dateilisten haben über eine Million Einträge.': 'For large DevKits this takes a moment – their file lists have more than a million entries.',
     'Wird entfernt …': 'Removing …',
+    'Installieren nach': 'Install to',
+    'Als Standard für künftige Installationen merken': 'Remember as default for future installs',
+    '{n} GB frei auf diesem Laufwerk': '{n} GB free on this drive',
+    '{title} installieren': 'Install {title}',
   },
 };
 
