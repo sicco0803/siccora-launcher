@@ -140,6 +140,101 @@ def verify_after(core, app, old_version=None):
     return 0
 
 
+def _long(path):
+    """Windows-Pfad ohne 260-Zeichen-Grenze (DevKits haben sehr tiefe Ordner)."""
+    path = os.path.abspath(path)
+    return path if path.startswith("\\\\?\\") else "\\\\?\\" + path
+
+
+def move(core, app, src, dst):
+    """Installation verschieben - auch in einen Unterordner oder auf ein anderes Laufwerk.
+
+    src/dst sind die vollstaendigen Ordner (z. B. D:\\Devkit -> E:\\Work\\Devkit). Gleiches Laufwerk:
+    nur umbenennen (Sekunden). Anderes Laufwerk: kopieren, pruefen, dann erst Legendary auf den
+    neuen Ort umstellen und das Original loeschen. Abgebrochen/neu gestartet: bereits kopierte
+    Dateien (gleiche Groesse) werden uebersprungen; steht Legendary schon auf dem Ziel, wird nur
+    noch das Original weggeraeumt.
+    """
+    import shutil
+    import stat
+    igame = core.get_installed_game(app)
+    if not igame:
+        print(f"ERROR: {app} ist nicht installiert")
+        return 1
+    src, dst = os.path.abspath(src), os.path.abspath(dst)
+    current = os.path.abspath(igame.install_path)
+    if os.path.normcase(current) == os.path.normcase(dst):
+        print("Neuer Ort ist bereits eingetragen - raeume das Original weg")
+    else:
+        if os.path.normcase(current) != os.path.normcase(src):
+            print(f"ERROR: Installation liegt nicht mehr in {src}")
+            return 1
+        same_drive = os.path.splitdrive(src)[0].lower() == os.path.splitdrive(dst)[0].lower()
+        if same_drive and os.path.commonpath([os.path.normcase(src), os.path.normcase(dst)]) == os.path.normcase(src):
+            print("ERROR: Das Ziel liegt innerhalb der Installation")
+            return 1
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        moved = False
+        if not os.path.exists(dst) and os.path.splitdrive(src)[0].lower() == os.path.splitdrive(dst)[0].lower():
+            try:
+                os.rename(_long(src), _long(dst))  # gleiches Laufwerk: sofort, auch in einen Unterordner
+                moved = True
+                print("MOVE_PROGRESS 1 1", flush=True)
+            except OSError as e:
+                if getattr(e, "winerror", None) in (5, 32):  # Zugriff verweigert / in Benutzung
+                    print(f"ERROR: Dateien sind in Benutzung - bitte Editor/Spiel und Explorer-Fenster schliessen ({e})")
+                    return 1
+                print(f"Umbenennen nicht moeglich ({e}) - kopiere stattdessen")
+        if not moved:
+            files, total = [], 0
+            for cur, dirs, names in os.walk(_long(src)):
+                dirs[:] = [d for d in dirs if not os.path.islink(os.path.join(cur, d))]
+                for n in names:
+                    p = os.path.join(cur, n)
+                    size = os.path.getsize(p)
+                    files.append((p, size))
+                    total += size
+            free = shutil.disk_usage(os.path.dirname(dst)).free
+            if free < total:
+                print(f"ERROR: Nicht genug Platz am Ziel ({free // 1048576} MB frei, {total // 1048576} MB noetig)")
+                return 1
+            done, shown = 0, 0.0
+            for p, size in files:
+                target = _long(os.path.join(dst, os.path.relpath(p, _long(src))))
+                if not (os.path.isfile(target) and os.path.getsize(target) == size):  # nach Fortsetzen ueberspringen
+                    os.makedirs(os.path.dirname(target), exist_ok=True)
+                    shutil.copy2(p, target)
+                done += size
+                if time.time() - shown >= 0.5:
+                    shown = time.time()
+                    print(f"MOVE_PROGRESS {done} {total}", flush=True)
+            print(f"MOVE_PROGRESS {total} {total}", flush=True)
+            # Kontrolle: jede Datei mit gleicher Groesse am Ziel?
+            missing = [p for p, size in files
+                       if os.path.getsize(_long(os.path.join(dst, os.path.relpath(p, _long(src))))) != size]
+            if missing:
+                print(f"ERROR: {len(missing)} Dateien wurden nicht vollstaendig kopiert - Original bleibt erhalten")
+                return 1
+        if not core.lgd.lock_installed():
+            print("ERROR: installed data lock")
+            return 1
+        igame.install_path = dst
+        core.lgd.set_installed_game(app, igame)
+        print("MOVE_RECORDED", flush=True)
+        if moved:
+            print("MOVE_DONE")
+            return 0
+
+    def force(func, path, _exc):
+        os.chmod(path, stat.S_IWRITE)  # schreibgeschuetzte Datei
+        func(path)
+    if os.path.exists(_long(src)):
+        print("Loesche das Original …", flush=True)
+        shutil.rmtree(_long(src), onerror=force)
+    print("MOVE_DONE")
+    return 0
+
+
 def set_tags(core, app, tags):
     igame = core.get_installed_game(app)
     igame.install_tags = [""] + sorted(t for t in tags if t)
@@ -236,6 +331,8 @@ def main():
         core.egl_export(app)
         ig = core.get_installed_game(app)
         egl_sync.finish_export(app, ig.version, ig.install_path, ig.install_tags or [], previous)
+    elif action == "move":
+        return move(core, app, sys.argv[3], sys.argv[4])
     elif action == "verify":
         if not core.is_installed(app):
             print(f"ERROR: {app} ist nicht installiert")

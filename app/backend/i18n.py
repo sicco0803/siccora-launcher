@@ -175,6 +175,8 @@ EN = {
     "Fertig – Nachkontrolle: alle {n} geänderten Dateien sind in Ordnung.": "Done – check: all {n} changed files are fine.",
     "Fehlerhafte Dateien konnten nicht neu geladen werden – bitte „Prüfen“ ausführen.": "Faulty files could not be downloaded again – please run \"Verify\".",
     "Bitte zuerst das Spiel installieren.": "Please install the game first.",
+    "Großes Paket – bereite Download speichersparend vor …": "Large package – preparing a memory-saving download …",
+    "Zu wenig Arbeitsspeicher für dieses Paket. Bitte andere Programme schließen oder weniger optionale Komponenten wählen.": "Not enough memory for this package. Please close other programs or choose fewer optional components.",
 }
 
 LANGUAGES = ("de", "en", "fr", "es", "it", "pl", "pt", "nl")

@@ -250,6 +250,7 @@ function busy(appName) {
 // Kurzer Stand eines Auftrags: Entfernen meldet keinen Fortschritt, darum ohne Prozent
 function jobBadge(job) {
   if (job.action === 'uninstall' && job.status === 'running') return t('Wird entfernt …');
+  if (job.action === 'move' && job.status === 'running') return `${t('Verschiebe …')} ${Math.floor(job.progress)} %`;
   if (job.status !== 'running' || job.phase === 'verify' && !job.verifyTotal) return t(STATUS[job.status]);
   return `${t(STATUS[job.status])} · ${Math.floor(job.progress)} %`;
 }
@@ -260,13 +261,45 @@ function itemActions(i, extra = '', tile = false) {
   if (job) return `<button class="btn ghost small" data-view-go="downloads" data-job-app="${app}">${esc(jobBadge(job))}</button>`;
   if (!i.installed) return `<button class="btn small" data-install="${app}">${esc(t('Installieren'))}</button>`;
   // in der Box sitzen Update (neben dem Namen) und Entfernen (X oben rechts) woanders
-  return (i.updateAvailable && !tile ? `<button class="btn small" data-update="${app}">${esc(t('Update'))}</button>` : '') + extra +
+  // Sichtbar: Update/Starten; alles Weitere im Menue "⋯" (sonst brechen die Knoepfe in zwei Zeilen um)
+  const entry = (attrs, label, cls = '') => `<button class="more-item${cls}" ${attrs}>${esc(t(label))}</button>`;
+  const menu = [
     // nur, wo es optionale Inhalte gibt (unbekannt = anzeigen, bis der Launcher es weiss)
-    (i.kind !== 'game' && i.hasOptions !== false ? `<button class="btn ghost small" data-options="${app}">${esc(t('Optionen'))}</button>` : '') +
-    `<button class="btn ghost small" data-folder="${esc(i.path)}">${esc(t('Ordner'))}</button>` +
-    `<button class="btn ghost small" data-repair="${app}" title="${esc(t('Dateien prüfen und defekte neu laden'))}">${esc(t('Prüfen'))}</button>` +
-    (tile ? '' : `<button class="btn danger small" data-uninstall="${app}" data-title="${esc(i.title)}">${esc(t('Entfernen'))}</button>`);
+    i.kind !== 'game' && i.hasOptions !== false ? entry(`data-options="${app}"`, 'Optionen') : '',
+    entry(`data-folder="${esc(i.path)}"`, 'Ordner öffnen'),
+    i.kind !== 'dlc' ? entry(`data-move="${app}"`, 'Verschieben') : '',
+    entry(`data-repair="${app}" title="${esc(t('Dateien prüfen und defekte neu laden'))}"`, 'Prüfen'),
+    tile ? '' : entry(`data-uninstall="${app}" data-title="${esc(i.title)}"`, 'Entfernen', ' danger'),
+  ].join('');
+  return (i.updateAvailable && !tile ? `<button class="btn small" data-update="${app}">${esc(t('Update'))}</button>` : '') + extra +
+    `<span class="more"><button class="btn ghost small more-btn" data-more="1" aria-haspopup="menu" aria-expanded="false"
+      title="${esc(t('Weitere Aktionen'))}" aria-label="${esc(t('Weitere Aktionen'))}">⋯</button>
+      <span class="more-menu" role="menu" hidden>${menu}</span></span>`;
 }
+
+// Menue "⋯" oeffnen/schliessen - feste Position, damit es nicht an der Kachel abgeschnitten wird
+function closeMoreMenus() {
+  document.querySelectorAll('.more-menu:not([hidden])').forEach((m) => {
+    m.hidden = true;
+    m.previousElementSibling?.setAttribute('aria-expanded', 'false');
+  });
+}
+function toggleMore(btn) {
+  const menu = btn.nextElementSibling;
+  const open = menu.hidden;
+  closeMoreMenus();
+  if (!open) return;
+  menu.hidden = false;
+  btn.setAttribute('aria-expanded', 'true');
+  const r = btn.getBoundingClientRect();
+  const w = menu.offsetWidth, h = menu.offsetHeight;
+  menu.style.left = `${Math.max(8, r.left + w + 8 <= innerWidth ? r.left : r.right - w)}px`;  // nach rechts, sonst nach links
+  menu.style.top = `${r.bottom + h + 6 > innerHeight ? r.top - h - 4 : r.bottom + 4}px`;
+}
+document.addEventListener('click', (e) => { if (!e.target.closest('.more')) closeMoreMenus(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMoreMenus(); });
+window.addEventListener('resize', closeMoreMenus);
+document.addEventListener('scroll', closeMoreMenus, true);
 
 // --- DLCs: haengen am Spiel; ohne Spiel nicht installierbar ------------------------
 function dlcsOf(appName) {
@@ -1228,9 +1261,14 @@ async function openAdd(kind) {
   $('#add-go').hidden = !items.length;
   $('#add-go').textContent = t('Installieren');
   state.adopt = null;
+  state.move = null;
   state.installApp = null;  // App kommt aus der Auswahlliste
   $('#adddlg').hidden = false;
-  if (items.length) wireInstallTarget(s);
+  if (items.length) {
+    wireInstallTarget(s);
+    loadInstallOptions($('#add-app').value);
+    $('#add-app').onchange = () => loadInstallOptions($('#add-app').value);
+  }
 }
 
 // --- Zielordner einer Installation: Standard aus den Einstellungen, auf Wunsch nur diesmal ein anderer ---
@@ -1239,7 +1277,60 @@ function installTargetHtml() {
       <code id="inst-dir"></code>
       <button class="btn ghost small" id="inst-change">${esc(t('Ändern'))}</button></div>
       <small class="inst-free" id="inst-free"></small></div>
-    <label class="check"><input type="checkbox" id="inst-remember"> ${esc(t('Als Standard für künftige Installationen merken'))}</label>`;
+    <label class="check"><input type="checkbox" id="inst-remember"> ${esc(t('Als Standard für künftige Installationen merken'))}</label>
+    <div id="inst-comps"></div>`;
+}
+
+// Was ist beim Installieren vorausgewaehlt? Wie beim Epic Launcher: alles ausser Debug-Symbolen,
+// weiteren Zielplattformen und hochaufloesenden Texturen (die sind oft riesig)
+const OPTIONAL_OFF = (tag) => tag === 'editor_symbols' || tag === 'textures' || tag.startsWith('platform_');
+
+// Optionale Komponenten vor der Installation laden und zur Auswahl anbieten
+async function loadInstallOptions(appName) {
+  const box = $('#inst-comps');
+  if (!box || !state.install) return;
+  const go = $('#add-go');
+  state.install.tags = null;
+  state.install.opts = null;
+  state.install.optsFor = appName;
+  box.innerHTML = `<p class="loading">${esc(t('Prüfe optionale Komponenten bei Epic …'))}</p>`;
+  go.disabled = true;
+  let o;
+  try { o = await call('install_options', appName); } catch (err) {
+    if (state.install?.optsFor !== appName) return;
+    box.innerHTML = `<p class="note">${esc(t('Komponenten konnten nicht geladen werden – es wird alles installiert.'))}</p>`;
+    go.disabled = false;
+    return;
+  }
+  if (state.install?.optsFor !== appName) return;  // inzwischen etwas anderes gewaehlt
+  go.disabled = false;
+  if (!o.components.length) { box.innerHTML = ''; return; }
+  state.install.opts = o;
+  state.install.tags = o.components.map((c) => c.tag).filter((tag) => !OPTIONAL_OFF(tag));
+  box.innerHTML = `<div class="field"><span>${esc(t('Optionale Komponenten'))}</span>
+    <div class="opt-list">${o.components.map((c) => `
+      <label class="opt-row"><span class="name">${esc(compName(c.tag))}</span>
+        <span class="size">${bytes(c.size)}</span>
+        <input type="checkbox" data-inst-tag="${esc(c.tag)}" ${state.install.tags.includes(c.tag) ? 'checked' : ''}></label>`).join('')}</div></div>
+    <div class="opt-sum" id="inst-sum"></div>`;
+  box.querySelectorAll('[data-inst-tag]').forEach((el) => {
+    el.onchange = () => {
+      state.install.tags = [...box.querySelectorAll('[data-inst-tag]:checked')].map((x) => x.dataset.instTag);
+      paintInstallSum();
+    };
+  });
+  paintInstallSum();
+}
+
+function paintInstallSum() {
+  const o = state.install?.opts;
+  const el = $('#inst-sum');
+  if (!o || !el) return;
+  const sel = new Set(state.install.tags);
+  // eine Datei kommt mit, sobald eine ihrer Komponenten gewaehlt ist
+  const size = o.baseSize + o.groups.filter((g) => g.tags.some((x) => sel.has(x))).reduce((a, g) => a + g.size, 0);
+  el.innerHTML = `<span>${esc(t('Grundpaket'))}</span><strong>${bytes(o.baseSize)}</strong>
+    <span>${esc(t('Benötigter Speicher'))}</span><strong>${bytes(size)}</strong>`;
 }
 
 function wireInstallTarget(s) {
@@ -1269,14 +1360,79 @@ async function openInstall(item) {
   $('#add-go').hidden = false;
   $('#add-go').textContent = t('Installieren');
   state.adopt = null;
+  state.move = null;
   state.installApp = item.appName;
   $('#adddlg').hidden = false;
   wireInstallTarget(s);
+  loadInstallOptions(item.appName);
 }
 
 $('#add-close').onclick = () => ($('#adddlg').hidden = true);
+// --- Installation verschieben: anderer Ordner (auch Unterordner) oder anderes Laufwerk ---
+async function openMove(appName) {
+  const item = state.library?.items.find((i) => i.appName === appName);
+  const info = await call('move_info', appName);
+  state.adopt = null;
+  state.install = null;
+  state.move = { app: appName, dir: null };
+  $('#add-heading').textContent = t('{title} verschieben', { title: item ? item.title : appName });
+  $('#add-body').innerHTML = `
+    <div class="field"><span>${esc(t('Aktueller Ort'))}</span><code>${esc(info.path)}</code>
+      <small class="inst-free" id="mv-size">${esc(t('Größe wird ermittelt …'))}</small></div>
+    <div class="field"><span>${esc(t('Verschieben nach'))}</span><div class="pick">
+      <code id="mv-dir">${esc(t('noch nicht festgelegt'))}</code>
+      <button class="btn ghost small" id="mv-change">${esc(t('Ändern'))}</button></div></div>
+    <div id="mv-info"></div>
+    <p class="hint">${esc(t('Der Installationsordner wandert in den gewählten Ordner, z. B. D:\\DevKit → E:\\Work\\DevKit. Erst wenn alles vollständig angekommen ist, wird das Original gelöscht.'))}</p>`;
+  $('#add-go').hidden = false;
+  $('#add-go').disabled = true;
+  $('#add-go').textContent = t('Verschieben');
+  $('#adddlg').hidden = false;
+  // echte Groesse aus dem Ordner (die Eintraege von Legendary/Epic stimmen nicht immer)
+  call('move_size', appName).then((r) => {
+    if (state.move?.app !== appName) return;
+    info.size = r.size;
+    $('#mv-size').textContent = t('Größe: {size}', { size: bytes(r.size) });
+    if (state.move.dir) $('#mv-change').onrefresh?.();
+  }).catch(() => { if ($('#mv-size')) $('#mv-size').textContent = ''; });
+  const refresh = async () => {
+    const r = await call('move_info', appName, state.move.dir);
+    const box = $('#mv-info');
+    if (r.problem) {
+      box.innerHTML = `<p class="note bad">${esc(r.problem)}</p>`;
+      $('#add-go').disabled = true;
+      return;
+    }
+    const tooSmall = !r.sameDrive && r.free < info.size;
+    box.innerHTML = `<p class="note">${esc(t('Neuer Ort: {path}', { path: r.target }))}<br>${esc(r.sameDrive
+      ? t('Gleiches Laufwerk – dauert nur wenige Sekunden.')
+      : t('Anderes Laufwerk – {size} werden kopiert ({free} frei). Das kann eine Weile dauern.', { size: bytes(info.size), free: bytes(r.free) }))}</p>`
+      + (tooSmall ? `<p class="note bad">${esc(t('Nicht genug Speicherplatz.'))}</p>` : '');
+    $('#add-go').disabled = tooSmall;
+  };
+  $('#mv-change').onrefresh = refresh;
+  $('#mv-change').onclick = async () => {
+    const p = await call('choose_folder');
+    if (p.cancelled) return;
+    state.move.dir = p.path;
+    $('#mv-dir').textContent = p.path;
+    await refresh();
+  };
+}
+
 $('#add-go').onclick = async () => {
   const app = $('#add-app')?.value;
+  if (state.move) {
+    if (!state.move.dir) { toast(t('Bitte zuerst den Ordner wählen.')); return; }
+    try {
+      await call('move_install', state.move.app, state.move.dir);
+      $('#adddlg').hidden = true;
+      state.move = null;
+      toast(t('Zur Warteschlange hinzugefügt – Fortschritt unter „Downloads“.'));
+      await pollDownloads.once();
+    } catch (err) { toast(err.message); }
+    return;
+  }
   if (state.adopt) {
     if (!state.adopt.path) { toast(t('Bitte zuerst den Ordner wählen.')); return; }
     try {
@@ -1300,6 +1456,9 @@ async function openAdopt(kind) {
     (heroic[b.appName] ? 1 : 0) - (heroic[a.appName] ? 1 : 0)
       || (kind === 'engine' ? b.title.localeCompare(a.title, undefined, { numeric: true }) : a.title.localeCompare(b.title)));
   state.adopt = { kind, heroic, path: items[0] ? heroic[items[0].appName] || null : null };
+  state.install = null;  // kein Installieren-Fenster offen
+  state.move = null;
+  $('#add-go').disabled = false;
   const label = (i) => `${i.title}${heroic[i.appName] ? ` (${t('in Heroic gefunden')})` : ''}`;
   $('#add-heading').textContent = t({ engine: 'Vorhandene Engine hinzufügen', game: 'Vorhandenes Spiel hinzufügen' }[kind] || 'Vorhandenes DevKit hinzufügen');
   $('#add-body').innerHTML = items.length ? `
@@ -1327,7 +1486,8 @@ async function startInstall(appName, target) {
   const item = state.library?.items.find((i) => i.appName === appName);
   if (!target && item && item.kind !== 'dlc') { await openInstall(item); return; }  // erst den Zielordner zeigen
   if (item?.preview && !(await askConfirm(t('{title} installieren?\n\nDas ist eine Vorabversion von Epic: Sie kann Fehler enthalten und ändert sich bis zur fertigen Version noch. Für echte Projekte besser nicht verwenden.', { title: item.title }), { ok: 'Trotzdem installieren' }))) return;
-  let res = await call('install', appName, target?.dir || null, !!target?.remember);
+  const tags = target && target.optsFor === appName ? target.tags : null;
+  let res = await call('install', appName, target?.dir || null, !!target?.remember, tags);
   if (res.needsInstallDir) {
     toast(t('Wähle zuerst den Ordner, in den installiert werden soll.'));
     const s = await call('choose_install_dir');
@@ -1372,9 +1532,9 @@ async function render() {
   if (v === 'settings') {
     const s = await call('settings');
     $('#meta').textContent = t('Änderungen werden sofort gespeichert.');
-    const setting = (label, help, control) => `<div class="setting">
+    const setting = (label, help, control, note = '') => `<div class="setting">
         <div class="label">${esc(t(label))}</div><div class="control">${control}</div>
-        <div class="help">${esc(t(help))}</div></div>`;
+        <div class="help">${esc(t(help))}</div>${note ? `<div class="setting-note">${note}</div>` : ''}</div>`;
     $('#content').innerHTML = `<div class="settings">
       <div>
         <h2 class="section">${esc(t('Allgemein'))}</h2>
@@ -1411,7 +1571,8 @@ async function render() {
             `<option value="${n}" ${n === s.speedLimit ? 'selected' : ''}>${n ? `${n} MB/s` : esc(t('Maximal'))}</option>`).join('')}</select>`)}
         ${setting('Parallele Verbindungen', 'Epic begrenzt das Tempo je Verbindung – mehr Verbindungen laden schneller, brauchen aber mehr Arbeitsspeicher (ca. 40 MB je Verbindung). Gilt ab dem nächsten Start oder Fortsetzen eines Downloads. Bei einem Tempolimit nutzt der Launcher nur so viele, wie dafür nötig sind.',
           `<select data-setting="maxWorkers">${s.workerChoices.map((n) =>
-            `<option value="${n}" ${n === s.maxWorkers ? 'selected' : ''}>${n}${n === 16 ? ` (${esc(t('Standard'))})` : ''}</option>`).join('')}</select>`)}
+            `<option value="${n}" ${n === s.maxWorkers ? 'selected' : ''}>${n}${n === 16 ? ` (${esc(t('Standard'))})` : ''}</option>`).join('')}</select>`,
+          s.ramGb && s.maxWorkers > s.ramGb ? `<span class="bad-text">${esc(t('Mehr Verbindungen als GB Arbeitsspeicher ({ram} GB): Bei sehr großen Downloads kann der Speicher knapp werden.', { ram: s.ramGb }))}</span>` : '')}
       </div></div>`;
     return;
   }
@@ -2021,6 +2182,8 @@ $('#filter-state').onchange = render;
 $('#content').addEventListener('click', async (e) => {
   const b = e.target.closest('button');
   if (!b) return;
+  if (b.dataset.more) { toggleMore(b); return; }
+  if (b.classList.contains('more-item')) closeMoreMenus();
   try {
     if (b.dataset.folder) await call('open_folder', b.dataset.folder);
     else if (b.dataset.url?.startsWith('https://www.fab.com/')) openInStore('fab', b.dataset.url);
@@ -2052,6 +2215,7 @@ $('#content').addEventListener('click', async (e) => {
     else if (b.dataset.update) await openPreview(b.dataset.update);
     else if (b.dataset.fab) await openFab(b.dataset.fab);
     else if (b.dataset.options) await openOptions(b.dataset.options);
+    else if (b.dataset.move) await openMove(b.dataset.move);
     else if (b.dataset.repair) { await call('repair', b.dataset.repair); toast(t('Prüfung in der Warteschlange.')); await pollDownloads.once(); }
     else if (b.dataset.uninstall) {
       if (!(await askConfirm(t('„{title}“ wirklich entfernen?\n\nAlle Dateien im Installationsordner werden gelöscht.', { title: b.dataset.title }), { ok: 'Entfernen', danger: true }))) return;

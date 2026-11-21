@@ -56,7 +56,15 @@ def _bridge():
 
 
 if __name__ == "__main__":
-    multiprocessing.freeze_support()  # Legendarys Download-Arbeiter starten diese exe erneut
+    try:
+        multiprocessing.freeze_support()  # Legendarys Download-Arbeiter starten diese exe erneut
+    except Exception:  # noqa: BLE001
+        # Scheitert ein Download-Arbeiter schon beim Start (z. B. Windows-Speicher erschoepft), zeigte
+        # PyInstaller sonst ein Fehlerfenster, das auf einen Klick wartet - Fehler nur protokollieren
+        import traceback
+        traceback.print_exc()
+        sys.stderr.flush()
+        os._exit(1)
     mode = sys.argv[1] if len(sys.argv) > 1 else ""
     if mode == "--lgd":
         _background(_lgd)

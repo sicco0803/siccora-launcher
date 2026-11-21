@@ -125,5 +125,7 @@ TEXTS = {
     "Fertig – Nachkontrolle: {bad} von {n} Dateien waren fehlerhaft und wurden neu geladen.": "Terminé – vérification : {bad} fichiers sur {n} étaient défectueux et ont été retéléchargés.",
     "Fertig – Nachkontrolle: alle {n} geänderten Dateien sind in Ordnung.": "Terminé – vérification : les {n} fichiers modifiés sont corrects.",
     "Fehlerhafte Dateien konnten nicht neu geladen werden – bitte „Prüfen“ ausführen.": "Impossible de retélécharger les fichiers défectueux – lancez « Vérifier ».",
-    "Bitte zuerst das Spiel installieren.": "Veuillez d’abord installer le jeu."
+    "Bitte zuerst das Spiel installieren.": "Veuillez d’abord installer le jeu.",
+    "Großes Paket – bereite Download speichersparend vor …": "Gros paquet – préparation d’un téléchargement économe en mémoire …",
+    "Zu wenig Arbeitsspeicher für dieses Paket. Bitte andere Programme schließen oder weniger optionale Komponenten wählen.": "Mémoire insuffisante pour ce paquet. Fermez d’autres programmes ou choisissez moins de composants optionnels."
 }

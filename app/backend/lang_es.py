@@ -125,5 +125,7 @@ TEXTS = {
     "Fertig – Nachkontrolle: {bad} von {n} Dateien waren fehlerhaft und wurden neu geladen.": "Listo – comprobación: {bad} de {n} archivos estaban defectuosos y se han vuelto a descargar.",
     "Fertig – Nachkontrolle: alle {n} geänderten Dateien sind in Ordnung.": "Listo – comprobación: los {n} archivos modificados están bien.",
     "Fehlerhafte Dateien konnten nicht neu geladen werden – bitte „Prüfen“ ausführen.": "No se pudieron volver a descargar los archivos defectuosos: ejecuta «Comprobar».",
-    "Bitte zuerst das Spiel installieren.": "Instala primero el juego."
+    "Bitte zuerst das Spiel installieren.": "Instala primero el juego.",
+    "Großes Paket – bereite Download speichersparend vor …": "Paquete grande: preparando una descarga que ahorra memoria …",
+    "Zu wenig Arbeitsspeicher für dieses Paket. Bitte andere Programme schließen oder weniger optionale Komponenten wählen.": "No hay suficiente memoria para este paquete. Cierra otros programas o elige menos componentes opcionales."
 }

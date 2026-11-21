@@ -42,6 +42,8 @@ RE_SPEED = re.compile(r"\+ Download\s+- ([\d.]+) MiB/s \(raw\)")
 RE_DONE_MB = re.compile(r"Downloaded: ([\d.]+) MiB")
 RE_DL_SIZE = re.compile(r"Download size: ([\d.]+) MiB")
 RE_INSTALL_SIZE = re.compile(r"Install size: ([\d.]+) MiB")
+RE_MOVE = re.compile(r"^MOVE_PROGRESS (\d+) (\d+)")
+RE_SHM = re.compile(r"shared memory cache is smaller than required: [\d.]+ MiB < ([\d.]+) MiB")
 RE_PROBLEM = re.compile(r"(ERROR|CRITICAL|FATAL|Failure):?\s*(.*)")
 RE_UP_TO_DATE = re.compile(r"Download size is 0")
 RE_INSTALL_PATH = re.compile(r"Install path: (.+)$")
@@ -58,7 +60,7 @@ RE_PRUNED = re.compile(r"^PRUNED (\d+) (\d+)")
 RE_SERVER = re.compile(r"\b[a-z][a-z0-9+.-]*://\S+|\b(?:[a-z0-9-]+\.)+(?:com|net|org|io|cloud|gg)\b(?:[/:]\S*)?", re.I)
 
 ACTION_LABEL = {"install": "Installieren", "update": "Update", "uninstall": "Deinstallieren", "repair": "Reparieren",
-                "fab": "Fab-Asset", "modify": "Komponenten ändern", "adopt": "Übernehmen"}
+                "fab": "Fab-Asset", "modify": "Komponenten ändern", "adopt": "Übernehmen", "move": "Verschieben"}
 
 
 class Downloads:
@@ -76,7 +78,7 @@ class Downloads:
 
     # --- oeffentliche Methoden ---------------------------------------------
     def add(self, action, app_name, title, base_path=None, from_egl=False, fab=None, label=None, components=None,
-            parent=None, parent_from_egl=False):
+            parent=None, parent_from_egl=False, tags=None, move=None):
         with self._lock:
             if any(j["appName"] == app_name and j["status"] in OPEN for j in self._jobs):
                 return {"error": tr("{title} ist bereits in der Liste (ggf. pausiert – dort fortsetzen).", title=title)}
@@ -84,6 +86,8 @@ class Downloads:
                    "components": components,  # {"selected": [...], "removed": [...], "adding": bool}
                    "appName": app_name, "title": title, "basePath": base_path, "fromEgl": from_egl,
                    "parent": parent, "parentFromEgl": parent_from_egl,  # DLC: Spiel, in dessen Ordner es landet
+                   "tags": tags,  # Installation: gewaehlte optionale Komponenten (None = alles wie bisher)
+                   "move": move,  # Verschieben: {"from": alter Ordner, "to": neuer Ordner}
                    "status": "queued", "progress": 0.0, "speed": 0.0, "eta": "", "downloadedMb": 0.0,
                    "downloadMb": None, "installMb": None, "message": "", "log": [], "added": time.time()}
             if action == "fab":
@@ -204,6 +208,22 @@ class Downloads:
             os.remove(os.path.join(legendary_dir(), "tmp", f"{app}.resume"))
         except OSError:
             pass
+        if job["action"] == "move":
+            # Abgebrochen: halbe Kopie am Ziel weg - aber NUR, solange Legendary noch auf das Original zeigt
+            mv = job.get("move") or {}
+            try:
+                with open(os.path.join(legendary_dir(), "installed.json"), encoding="utf-8") as f:
+                    current = (json.load(f).get(app) or {}).get("install_path") or ""
+            except (OSError, ValueError):
+                current = ""
+            same = lambda a, b: os.path.normcase(os.path.abspath(a or "")) == os.path.normcase(os.path.abspath(b or ""))
+            if mv.get("to") and same(current, mv.get("from")) and not same(mv["to"], mv["from"]) \
+                    and os.path.isdir(mv["to"]) and os.path.isdir(mv["from"]):
+                shutil.rmtree("\\\\?\\" + os.path.abspath(mv["to"]), ignore_errors=True)
+                job["message"] = "Abgebrochen – das Original ist unverändert, die halbe Kopie wurde gelöscht."
+            else:
+                job["message"] = "Abgebrochen."
+            return
         if job["action"] == "fab":
             # nur einen gerade begonnenen Download wegraeumen - nie ein behaltenes Asset oder Epics Cache
             if (job.get("fab") or {}).get("source", "download") == "download":
@@ -256,6 +276,8 @@ class Downloads:
             return self._run_modify(job)
         if job["action"] == "adopt":
             return self._run_adopt(job)
+        if job["action"] == "move":
+            return self._run_move(job)
         app = job["appName"]
         if job["fromEgl"]:
             job["message"] = "Übernehme Installation aus dem Epic Launcher …"
@@ -280,6 +302,11 @@ class Downloads:
             args = ["-y", "install", app, "--skip-sdl", "--skip-dlcs"]
             if job["action"] == "install" and job["basePath"]:
                 args += ["--base-path", job["basePath"]]
+            if job["action"] == "install" and job.get("tags") is not None:
+                # gewaehlte Komponenten ("" = Grundpaket) - sonst laedt Legendary ALLES
+                # (bei Engines z. B. 38 GB Debug-Symbole und alle Zielplattformen)
+                for tag in [""] + [t for t in job["tags"] if t]:
+                    args += ["--install-tag", tag]
             if job["action"] == "update":
                 args.append("--update-only")
             if job["action"] == "repair":
@@ -297,6 +324,30 @@ class Downloads:
                 job["oldVersion"] = _installed_version(app)
             job["message"] = "Bereite Prüfung vor …" if job["action"] == "repair" else "Bereite Download vor …"
             ok = self._exec(job, LEGENDARY + args + _workers())
+            if not ok and job["status"] == "running" and job.get("shmNeeded"):
+                # Sehr grosse Pakete (z. B. ARK DevKit) brauchen in Legendarys Reihenfolge mehr Zwischenspeicher
+                # fuer gemeinsam genutzte Download-Stuecke als dessen Standard (2 GB). Neuer Versuch mit
+                # gruppierter Reihenfolge (lgd_run._grouped_order, braucht meist unter 2 GB) und - wenn der
+                # PC genug RAM hat - zusaetzlich mehr Zwischenspeicher.
+                for attempt in (1, 2):
+                    needed = job.pop("shmNeeded", None)
+                    if not needed or not ok and job["status"] != "running":
+                        break
+                    extra = _shm_args(needed, last=attempt == 2)
+                    if extra is None:  # auch mit gruppierter Reihenfolge zu wenig RAM
+                        job["log"].append("[Siccora] Zu wenig Arbeitsspeicher fuer dieses Paket")
+                        job["shmTooBig"] = True
+                        break
+                    job["message"] = "Großes Paket – bereite Download speichersparend vor …"
+                    note = f"[Siccora] Neuer Versuch {attempt}: gruppierte Reihenfolge {' '.join(extra)}".strip()
+                    debuglog.job_line(job, note)
+                    job["log"].append(note)
+                    ok = self._exec(job, LEGENDARY + args + extra + _workers(), extra_env={"SICCORA_GROUP_ORDER": "1"})
+                    if ok:
+                        break
+                if not ok and (job.get("shmTooBig") or job.get("shmNeeded")) and job["status"] == "running":
+                    return self._fail(job, "Zu wenig Arbeitsspeicher für dieses Paket. Bitte andere Programme schließen "
+                                           "oder weniger optionale Komponenten wählen.")
             if ok and job["status"] == "running" and job["action"] in ("install", "update") and settings.get("verifyAfter"):
                 ok = self._verify_after(job, app)
             if ok and job["status"] == "running":
@@ -367,6 +418,31 @@ class Downloads:
             ("download", False): "Fertig: {copied} Dateien kopiert.",
         }[(source, bool(skipped))]
         job["msgVars"] = {"copied": copied, "skipped": skipped}
+
+    def _run_move(self, job):
+        """Installation verschieben (egl_bridge.move): gleiches Laufwerk sofort, sonst kopieren mit
+        Fortschritt; Original erst nach vollstaendiger Kopie loeschen. Danach neuen Ort an den Epic
+        Launcher melden."""
+        app, mv = job["appName"], job["move"]
+        if job["fromEgl"]:
+            job["message"] = "Übernehme Installation aus dem Epic Launcher …"
+            if not self._exec(job, BRIDGE + ["import", app]):
+                if self._stopped(job):
+                    return
+                return self._fail(job, "Übernahme aus dem Epic Launcher fehlgeschlagen.")
+            job["fromEgl"] = False
+        job["message"], job["msgVars"] = "Verschiebe nach {path} …", {"path": mv["to"]}
+        ok = self._exec(job, BRIDGE + ["move", app, mv["from"], mv["to"]])
+        if self._stopped(job):
+            return
+        if not ok:
+            problems = [line for line in job["log"] if RE_PROBLEM.search(line)]
+            return self._fail(job, problems[-1] if problems else "Verschieben fehlgeschlagen.")
+        self._export_to_egl(job, app)
+        if self._stopped(job):
+            return
+        job["status"], job["progress"] = "done", 100.0
+        job["message"], job["msgVars"] = "Fertig – verschoben nach {path}.", {"path": mv["to"]}
 
     def _run_adopt(self, job):
         """Vorhandene Installation uebernehmen. Ohne Epics Verwaltungsdaten (z. B. aus Heroic)
@@ -509,6 +585,14 @@ class Downloads:
             return
         if line.startswith("EGL_BUSY"):
             job["eglBusy"] = True
+        if m := RE_MOVE.search(line):
+            done, total = int(m.group(1)), int(m.group(2))
+            job["progress"] = 100.0 * done / max(total, 1)
+            job["downloadedMb"], job["downloadMb"] = done / 1048576, total / 1048576
+        if line.startswith("MOVE_RECORDED"):
+            job["moveRecorded"] = True
+        if m := RE_SHM.search(line):
+            job["shmNeeded"] = float(m.group(1))
         log = job["log"]
         shown = hide_servers(line)  # nur die Anzeige - ausgewertet wird weiter die Originalzeile
         if m := RE_VERIFY.search(line):
@@ -640,6 +724,36 @@ def egl_pending_add(app):
         _save(EGL_PENDING, pending + [app])
 
 
+def _total_ram_mib():
+    import ctypes
+
+    class MEMORYSTATUSEX(ctypes.Structure):
+        _fields_ = [("dwLength", ctypes.c_ulong), ("dwMemoryLoad", ctypes.c_ulong),
+                    ("ullTotalPhys", ctypes.c_ulonglong), ("ullAvailPhys", ctypes.c_ulonglong),
+                    ("ullTotalPageFile", ctypes.c_ulonglong), ("ullAvailPageFile", ctypes.c_ulonglong),
+                    ("ullTotalVirtual", ctypes.c_ulonglong), ("ullAvailVirtual", ctypes.c_ulonglong),
+                    ("ullAvailExtendedVirtual", ctypes.c_ulonglong)]
+    st = MEMORYSTATUSEX()
+    st.dwLength = ctypes.sizeof(st)
+    if not ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(st)):
+        return 0
+    return st.ullTotalPhys // 1048576
+
+
+def _shm_args(needed_mib, last=False):
+    """Zusatz-Argumente fuer den Neuversuch (immer mit gruppierter Reihenfolge).
+    1. Versuch: mehr Zwischenspeicher nur, wenn er in ein Drittel des RAM passt - sonst reicht meist
+       schon die gruppierte Reihenfolge mit Legendarys 2 GB.
+    2. Versuch (gruppiert hat nicht gereicht): bis zur Haelfte des RAM, sonst None = aufgeben."""
+    # 1. Versuch bewusst OHNE mehr Zwischenspeicher: die gruppierte Reihenfolge braucht selbst beim ARK
+    # DevKit unter 2 GB, und jeder zusaetzliche GB Zwischenspeicher belastet Windows' Speicher sofort
+    # (Test-VM mit 16 GB: "Auslagerungsdatei zu klein" bei 4,2 GB Zwischenspeicher + 64 Verbindungen).
+    if not last:
+        return []
+    wanted = int(needed_mib) + 64
+    return ["--max-shared-memory", str(wanted)] if wanted <= _total_ram_mib() // 3 else None
+
+
 def egl_startup_check():
     """Einmal beim Start: Installationen, die der Epic Launcher mit falschem Stand fuehrt (z. B. von
     einer aelteren Launcher-Version), zur Meldung vormerken - egl_pending_flush erledigt den Rest."""
@@ -701,6 +815,8 @@ def _installed_version(app):
 def _connections():
     """Parallele Verbindungen. Beim Tempolimit weniger (Epic liefert etwa 0,5 MB/s je
     Verbindung) - das Tempo wird so gleichmaessiger."""
+    # Die Wahl des Nutzers gilt - mehr Verbindungen als GB Arbeitsspeicher zeigt nur eine Warnung
+    # in den Einstellungen (jede Verbindung ist ein eigener Prozess, ~45 MB)
     workers, limit = settings.get("maxWorkers"), settings.get("speedLimit")
     return min(workers, max(2, limit * 2)) if limit else workers
 

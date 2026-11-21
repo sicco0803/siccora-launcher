@@ -82,6 +82,43 @@ _SILENT_DELETE = TaskFlags.DELETE_FILE | TaskFlags.SILENT
 _orig_run_analysis = DLManager.run_analysis
 
 
+def _grouped_order(manifest, old_manifest=None, install_tags=None, spread=2000):
+    """Download-Reihenfolge, bei der deutlich weniger Zwischenspeicher noetig ist.
+
+    Legendary arbeitet die Dateien alphabetisch ab. Ein Download-Stueck, das Dateien an weit
+    entfernten Stellen gemeinsam nutzen, bleibt so lange im Speicher, bis die letzte davon fertig
+    ist - bei sehr grossen DevKits braucht das 4-5 GB. Hier rueckt jede Datei, die solche Stuecke
+    nutzt, direkt hinter die erste Datei mit demselben Stueck. Gemessen am ARK DevKit:
+    4103 -> 1102 MiB (nur Grundpaket), 5333 -> 1688 MiB (alles), Rechenzeit 2-4 s.
+    Legendarys eigene Umsortierung schaltet sich ab 100.000 Dateien ab (zu langsam)."""
+    elements = manifest.file_manifest_list.elements
+    tags = None if install_tags is None else ([install_tags] if isinstance(install_tags, str) else list(install_tags))
+    unchanged = set()
+    if old_manifest is not None:
+        old = {fm.filename: fm.sha_hash for fm in old_manifest.file_manifest_list.elements}
+        unchanged = {fm.filename for fm in elements if old.get(fm.filename) == fm.sha_hash}
+
+    def wanted(fm):  # dieselbe Regel wie Legendary (leeres Tag = Grundpaket)
+        if fm.filename in unchanged:
+            return False
+        return tags is None or any((t in fm.install_tags) or (not t and not fm.install_tags) for t in tags)
+
+    byname = sorted(elements, key=lambda f: f.filename.lower())
+    relevant = [fm for fm in byname if wanted(fm)]
+    first, last = {}, {}
+    for i, fm in enumerate(relevant):
+        for cp in fm.chunk_parts:
+            first.setdefault(cp.guid_num, i)
+            last[cp.guid_num] = i
+    key = {}
+    for i, fm in enumerate(relevant):
+        anchor = min((first[cp.guid_num] for cp in fm.chunk_parts if last[cp.guid_num] - first[cp.guid_num] > spread),
+                     default=i)
+        key[fm.filename] = (min(anchor, i), i)
+    order = sorted(relevant, key=lambda f: key[f.filename])
+    return order + [fm for fm in byname if fm.filename not in key]  # Rest ueberspringt Legendary ohnehin
+
+
 def _run_analysis_without_tag_deletes(self, *args, **kwargs):
     # Zweiter Loeschweg: Bei jeder Installation/jedem Update mit Komponenten-Auswahl
     # haengt Legendary still Loeschauftraege fuer alle Dateien ausserhalb der Auswahl an
@@ -89,7 +126,26 @@ def _run_analysis_without_tag_deletes(self, *args, **kwargs):
     # waeren deren Dateien weg. Nur erlaubt, wenn der Launcher es ausdruecklich will
     # (Komponenten bewusst abwaehlen) - echte Loeschungen entfallener Dateien
     # (nur DELETE_FILE) bleiben unberuehrt.
-    result = _orig_run_analysis(self, *args, **kwargs)
+    if os.environ.get("SICCORA_GROUP_ORDER") == "1":
+        # vom Launcher angefordert (nach "zu wenig Zwischenspeicher"): gruppierte Reihenfolge unterschieben -
+        # Legendary sortiert die Dateiliste selbst; nur genau dieser Aufruf bekommt unsere Reihenfolge
+        import builtins
+        manifest = kwargs.get("manifest", args[0] if args else None)
+        order = _grouped_order(manifest, kwargs.get("old_manifest"), kwargs.get("file_install_tag"))
+        elements = manifest.file_manifest_list.elements
+        print(f"[Siccora] Speichersparende Reihenfolge fuer {len(order)} Dateien", flush=True)
+
+        def _sorted(iterable, *a, **kw):
+            if iterable is elements:
+                return list(order)
+            return builtins.sorted(iterable, *a, **kw)
+        dl_manager.sorted = _sorted
+        try:
+            result = _orig_run_analysis(self, *args, **kwargs)
+        finally:
+            del dl_manager.sorted
+    else:
+        result = _orig_run_analysis(self, *args, **kwargs)
     if os.environ.get("SICCORA_ALLOW_TAG_DELETE") != "1":
         keep = [t for t in self.tasks if not (isinstance(t, FileTask) and (t.flags & _SILENT_DELETE) == _SILENT_DELETE)]
         dropped = len(self.tasks) - len(keep)

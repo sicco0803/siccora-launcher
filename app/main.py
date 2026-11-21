@@ -18,7 +18,7 @@ import webview
 
 from backend import autostart, cleanup, components, crashes, debuglog, freefab, launch, projects, selfupdate, settings
 from backend.tray import Tray
-from backend.downloads import Downloads, egl_pending_flush, egl_startup_check, hide_servers
+from backend.downloads import Downloads, _total_ram_mib, egl_pending_flush, egl_startup_check, hide_servers
 from backend.epic import DATA_DIR, LOGIN_URL, EpicService
 from backend.storepanel import StorePanel, guard_main
 from backend.fab_install import KINDS, compatibility, read_project
@@ -30,7 +30,7 @@ from backend.vault import asset_updates, epic_cached, epic_vault_dirs
 
 # im fertigen Paket liegen ui/ usw. im Entpack-Ordner von PyInstaller
 HERE = getattr(sys, "_MEIPASS", None) or os.path.dirname(os.path.abspath(__file__))
-APP_VERSION = "1.0.9"
+APP_VERSION = "1.0.10"
 
 # Sprache fest in der Adresse: Fab ignoriert die Browsersprache und entscheidet sonst
 # selbst (bei Mike kam so eine fremde Sprache heraus); Fab: ?lang=de, Epic: /de/ bzw. /en-US/
@@ -71,6 +71,7 @@ class Api:
         self._login_window = None
         self._close_confirmed = False
         self._tray = None  # Symbol im Infobereich (main)
+        self._move_sizes = {}  # appName -> gemessene Ordnergroesse (Verschieben-Fenster)
 
     def _after_job(self, job):
         """Nach einer Aenderung am Element den Komponenten-Stand im Hintergrund neu pruefen,
@@ -119,6 +120,7 @@ class Api:
     @_safe
     def settings(self):
         return {**settings.load(), "workerChoices": settings.WORKER_CHOICES, "speedChoices": settings.SPEED_CHOICES,
+                "ramGb": round(_total_ram_mib() / 1024),
                 "epicVaultDirs": epic_vault_dirs(), "autostart": autostart.get()}
 
     @_safe
@@ -524,7 +526,7 @@ class Api:
         return settings.save({"installDir": picked[0]})
 
     @_safe
-    def install(self, app_name, base_dir=None, remember=False):
+    def install(self, app_name, base_dir=None, remember=False, tags=None):
         """base_dir: Ordner nur fuer diese Installation (sonst der Standard aus den Einstellungen);
         remember: diesen Ordner ausserdem als neuen Standard speichern."""
         item = self._epic.find(app_name)
@@ -551,7 +553,14 @@ class Api:
             base = settings.get("installDir")
         if not base:
             return {"needsInstallDir": True}
-        return self._downloads.add("install", app_name, item["title"], base_path=base)
+        if tags is not None:  # gewaehlte Komponenten aus dem Installieren-Fenster
+            tags = [str(t) for t in tags if t and isinstance(t, str)]
+        return self._downloads.add("install", app_name, item["title"], base_path=base, tags=tags)
+
+    @_safe
+    def install_options(self, app_name):
+        """Optionale Komponenten vor der Installation (Groessen fuer die Auswahl im Fenster)."""
+        return components.available(self._epic, app_name)
 
     @_safe
     def disk_free(self, path):
@@ -620,6 +629,100 @@ class Api:
     @_safe
     def adopt_options(self):
         return {"heroic": self._epic.heroic_installed()}
+
+    # --- Installation verschieben ----------------------------------------------
+    def _install_size(self, app_name, local):
+        """Groesse laut Legendary bzw. Epic Launcher (ohne den Ordner zu durchsuchen) - der groessere
+        Wert, weil Legendary nach einer Uebernahme manchmal nur einen Teil kennt. Die genaue Groesse
+        ermittelt das Verschieben selbst und prueft den Platz am Ziel dann noch einmal."""
+        sizes = []
+        try:
+            with open(os.path.join(self._epic.core.lgd.path, "installed.json"), encoding="utf-8") as f:
+                sizes.append(int((json.load(f).get(app_name) or {}).get("install_size") or 0))
+        except (OSError, ValueError, TypeError):
+            pass
+        from backend.egl_sync import find_item
+        try:
+            with open(find_item(app_name) or "", encoding="utf-8") as f:
+                sizes.append(int(json.load(f).get("InstallSize") or 0))
+        except (OSError, ValueError, TypeError):
+            pass
+        return max(sizes + [self._move_sizes.get(app_name, 0)], default=0)
+
+    def _move_target(self, app_name, target_dir):
+        """-> (lokal, Quelle, Ziel) oder {"error": ...}. Ziel = gewaehlter Ordner + Name des Installationsordners,
+        also z. B. D:\\Devkit -> D:\\Work\\Devkit oder E:\\Work\\Devkit."""
+        local = self._epic.installed().get(app_name)
+        if not local:
+            return {"error": tr("Nicht installiert.")}
+        src = os.path.abspath(local["path"])
+        if not target_dir or not settings.local_dir(target_dir):
+            return {"error": tr("Ordner existiert nicht oder ist ein Netzwerkpfad.")}
+        dst = os.path.join(os.path.abspath(target_dir), os.path.basename(src.rstrip("\\/")))
+        n = os.path.normcase
+        if n(dst) == n(src):
+            return {"error": tr("Die Installation liegt bereits dort.")}
+        if os.path.splitdrive(src)[0].lower() == os.path.splitdrive(dst)[0].lower() \
+                and os.path.commonpath([n(src), n(dst)]) == n(src):
+            return {"error": tr("Das Ziel darf nicht innerhalb der Installation liegen.")}
+        if os.path.exists(dst):
+            return {"error": tr("Am Ziel gibt es schon einen Ordner „{name}“.", name=os.path.basename(dst))}
+        return local, src, dst
+
+    @_safe
+    def move_info(self, app_name, target_dir=None):
+        local = self._epic.installed().get(app_name)
+        if not local:
+            return {"error": tr("Nicht installiert.")}
+        info = {"path": local["path"], "size": self._install_size(app_name, local)}
+        if target_dir:
+            res = self._move_target(app_name, target_dir)
+            if isinstance(res, dict):
+                info["problem"] = res["error"]
+            else:
+                _, src, dst = res
+                same = os.path.splitdrive(src)[0].lower() == os.path.splitdrive(dst)[0].lower()
+                info.update(target=dst, sameDrive=same, free=shutil.disk_usage(target_dir).free)
+        return info
+
+    @_safe
+    def move_size(self, app_name):
+        """Echte Groesse des Installationsordners (bei DevKits mit 1,6 Mio. Dateien rund eine Minute)."""
+        local = self._epic.installed().get(app_name)
+        if not local:
+            return {"error": tr("Nicht installiert.")}
+        total, stack = 0, ["\\\\?\\" + os.path.abspath(local["path"])]
+        while stack:
+            try:
+                entries = list(os.scandir(stack.pop()))
+            except OSError:
+                continue
+            for e in entries:
+                try:
+                    if e.is_dir(follow_symlinks=False):
+                        stack.append(e.path)
+                    elif e.is_file(follow_symlinks=False):
+                        total += e.stat(follow_symlinks=False).st_size
+                except OSError:
+                    continue
+        self._move_sizes[app_name] = total
+        return {"size": total}
+
+    @_safe
+    def move_install(self, app_name, target_dir):
+        busy = self._egl_busy(app_name)
+        if busy:
+            return busy
+        res = self._move_target(app_name, target_dir)
+        if isinstance(res, dict):
+            return res
+        local, src, dst = res
+        if os.path.splitdrive(src)[0].lower() != os.path.splitdrive(dst)[0].lower() \
+                and shutil.disk_usage(target_dir).free < self._install_size(app_name, local):
+            return {"error": tr("Nicht genug Speicherplatz.")}
+        item = self._epic.find(app_name)
+        return self._downloads.add("move", app_name, item["title"] if item else app_name,
+                                   from_egl=local["source"] == "egl", move={"from": src, "to": dst})
 
     @_safe
     def adopt_install(self, app_name, path):

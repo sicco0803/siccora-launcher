@@ -44,6 +44,12 @@ def egl_running():
     return "epicgameslauncher.exe" in out.lower()
 
 
+def valid_guid(guid):
+    """Kennungen des Epic Launchers sind immer 32 Hex-Zeichen. Alles andere (z. B. "..\\x" in einer
+    manipulierten Datei unter ProgramData) wird nie zu einem Dateipfad zusammengesetzt."""
+    return bool(re.fullmatch(r"[0-9A-Fa-f]{32}", str(guid or "")))
+
+
 def _tagset(tags):
     return frozenset(t.strip() for t in tags if t and t.strip())
 
@@ -179,10 +185,12 @@ EGI_DIR = os.path.join(PROGRAMDATA, "Epic", "EpicOnlineServicesShared", "Install
 EMPTY_MANIFEST_DATA = {"version": "", "launchCommand": "", "launchExe": "", "prereqSHA1Hash": "", "buildSize": 0}
 
 
-def update_egi(guid, version, tags, egi_dir=EGI_DIR, backup_dir=BACKUP_DIR, log=print):
+def update_egi(guid, version, tags, egi_dir=EGI_DIR, backup_dir=BACKUP_DIR, log=print, install_path=None):
     """Das eigentliche Gedaechtnis des Epic Launchers (Install-Helfer, *.egi): Version, gewaehlte
     Komponenten (hier direkt als Tags) und kein halbfertiges Update mehr. Ohne diesen Schritt
     "setzt" er alte Updates fort oder aktualisiert mit leerer Auswahl - und loescht dabei Karten."""
+    if not valid_guid(guid):
+        return False
     path = os.path.join(egi_dir, f"{guid}.egi")
     if not os.path.isfile(path):
         return False
@@ -204,6 +212,12 @@ def update_egi(guid, version, tags, egi_dir=EGI_DIR, backup_dir=BACKUP_DIR, log=
     info["stagedVersion"] = ""
     info["manifestData"] = {**(info.get("manifestData") or EMPTY_MANIFEST_DATA), "version": version}
     info["pendingManifestData"] = dict(EMPTY_MANIFEST_DATA)
+    if install_path:  # z. B. nach dem Verschieben: alle Pfade auf den neuen Ort
+        meta = os.path.join(install_path, ".egstore")
+        info["dir"] = install_path
+        info["metaDir"] = meta
+        info["manifestPath"] = os.path.join(meta, f"{guid}.manifest")
+        info["pendingManifestPath"] = os.path.join(meta, "Pending", f"{guid}.manifest")
     width = len(str(info.get("revision") or "")) or 32
     info["revision"] = format(max(revisions, default=0) + 1, f"0{width}X")
     _write(path, data)
@@ -225,6 +239,8 @@ def needs_sync(app_name, version, install_path, tags, lgd_dir, items_dir=ITEMS_D
     if os.path.normcase(os.path.abspath(item.get("InstallLocation") or "")) != os.path.normcase(os.path.abspath(install_path)):
         return False
     guid = item.get("InstallationGuid") or ""
+    if not valid_guid(guid):
+        return False
     egi_path = os.path.join(egi_dir, f"{guid}.egi")
     ours = glob.glob(os.path.join(lgd_dir, "manifests", f"{glob.escape(app_name)}_*_{glob.escape(version)}.manifest"))
     ours_time = max((os.path.getmtime(f) for f in ours), default=0)
@@ -252,6 +268,9 @@ def finish_export(app_name, version, install_path, our_tags, previous, items_dir
         return False
     item = _read(item_path)
     guid = item.get("InstallationGuid") or os.path.splitext(os.path.basename(item_path))[0]
+    if not valid_guid(guid):
+        log("EGL_SYNC unerwartete Kennung im Eintrag des Epic Launchers - nichts geschrieben")
+        return False
     egstore = os.path.join(install_path, ".egstore")
     manifest = os.path.join(egstore, f"{guid}.manifest")
     pending_manifest = os.path.join(egstore, "Pending", f"{guid}.manifest")
@@ -269,7 +288,7 @@ def finish_export(app_name, version, install_path, our_tags, previous, items_dir
     item["bNeedsValidation"] = False
     _write(item_path, item)
     log(f"EGL_SYNC Komponenten: {len(comps)} ({why})")
-    update_egi(guid, version, our_tags, egi_dir, backup_dir, log)
+    update_egi(guid, version, our_tags, egi_dir, backup_dir, log, install_path=install_path)
 
     # ein altes, abgebrochenes Update des Epic Launchers wuerde er sonst "fortsetzen"
     for stale in (pending_item, pending_manifest):
@@ -283,9 +302,13 @@ def finish_export(app_name, version, install_path, our_tags, previous, items_dir
         dat = _read(installed_dat)
         changed = False
         for e in dat.get("InstallationList", []):
-            if e.get("AppName") == app_name and e.get("AppVersion") != version:
-                e["AppVersion"] = version
-                changed = True
+            if e.get("AppName") == app_name:
+                if e.get("AppVersion") != version:
+                    e["AppVersion"] = version
+                    changed = True
+                if os.path.normcase(os.path.abspath(e.get("InstallLocation") or "")) != os.path.normcase(os.path.abspath(install_path)):
+                    e["InstallLocation"] = install_path  # verschoben
+                    changed = True
         if changed:
             _write(installed_dat, dat)
             log("EGL_SYNC Sammelliste aktualisiert")

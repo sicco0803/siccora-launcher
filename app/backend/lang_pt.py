@@ -125,5 +125,7 @@ TEXTS = {
     "Fertig – Nachkontrolle: {bad} von {n} Dateien waren fehlerhaft und wurden neu geladen.": "Concluído – verificação: {bad} de {n} ficheiros tinham defeito e foram transferidos de novo.",
     "Fertig – Nachkontrolle: alle {n} geänderten Dateien sind in Ordnung.": "Concluído – verificação: os {n} ficheiros alterados estão em ordem.",
     "Fehlerhafte Dateien konnten nicht neu geladen werden – bitte „Prüfen“ ausführen.": "Não foi possível transferir de novo os ficheiros com defeito – executa «Verificar».",
-    "Bitte zuerst das Spiel installieren.": "Instala primeiro o jogo."
+    "Bitte zuerst das Spiel installieren.": "Instala primeiro o jogo.",
+    "Großes Paket – bereite Download speichersparend vor …": "Pacote grande – a preparar uma transferência que poupa memória …",
+    "Zu wenig Arbeitsspeicher für dieses Paket. Bitte andere Programme schließen oder weniger optionale Komponenten wählen.": "Memória insuficiente para este pacote. Feche outros programas ou escolha menos componentes opcionais."
 }

@@ -125,5 +125,7 @@ TEXTS = {
     "Fertig – Nachkontrolle: {bad} von {n} Dateien waren fehlerhaft und wurden neu geladen.": "Klaar – controle: {bad} van {n} bestanden waren defect en zijn opnieuw gedownload.",
     "Fertig – Nachkontrolle: alle {n} geänderten Dateien sind in Ordnung.": "Klaar – controle: alle {n} gewijzigde bestanden zijn in orde.",
     "Fehlerhafte Dateien konnten nicht neu geladen werden – bitte „Prüfen“ ausführen.": "Defecte bestanden konden niet opnieuw worden gedownload – voer \"Controleren\" uit.",
-    "Bitte zuerst das Spiel installieren.": "Installeer eerst de game."
+    "Bitte zuerst das Spiel installieren.": "Installeer eerst de game.",
+    "Großes Paket – bereite Download speichersparend vor …": "Groot pakket – geheugenbesparende download wordt voorbereid …",
+    "Zu wenig Arbeitsspeicher für dieses Paket. Bitte andere Programme schließen oder weniger optionale Komponenten wählen.": "Te weinig geheugen voor dit pakket. Sluit andere programma’s of kies minder optionele onderdelen."
 }

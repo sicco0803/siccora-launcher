@@ -72,6 +72,48 @@ def refresh_options(service):
         _running.release()
 
 
+_available = {}  # (appName, Version) -> Ergebnis; die Dateiliste grosser DevKits ist ueber 200 MB gross
+
+
+def available(service, app_name):
+    """Vor der Installation: welche optionalen Komponenten es gibt und wie gross sie sind.
+    Liest Epics aktuelle Dateiliste (laedt nichts herunter ausser dieser Liste)."""
+    import types
+    item = service.find(app_name)
+    if not item:
+        return {"error": tr("Eintrag nicht in der Bibliothek gefunden.")}
+    key = (app_name, item.get("latest"))
+    if key in _available:
+        return _available[key]
+    core = service.core
+    with service._lock:
+        core.login()
+        game = types.SimpleNamespace(namespace=item["namespace"], catalog_item_id=item["catalogItemId"], app_name=app_name)
+        data = core.get_cdn_manifest(game)[0]
+    manifest = core.load_manifest(data)
+    del data
+    sizes, base = {}, 0
+    for fm in manifest.file_manifest_list.elements:
+        if not fm.install_tags:
+            base += fm.file_size
+            continue
+        for t in set(fm.install_tags):
+            sizes[t] = sizes.get(t, 0) + fm.file_size
+    # Groesse je Auswahl exakt rechnen koennen: Dateien nach Komponenten-Kombination gruppiert
+    groups = {}
+    for fm in manifest.file_manifest_list.elements:
+        if fm.install_tags:
+            k = tuple(sorted(set(fm.install_tags)))
+            groups[k] = groups.get(k, 0) + fm.file_size
+    result = {"appName": app_name, "version": manifest.meta.build_version, "baseSize": base,
+              "components": sorted(({"tag": t, "size": s} for t, s in sizes.items()), key=lambda c: -c["size"]),
+              "groups": [{"tags": list(k), "size": s} for k, s in groups.items()]}
+    del manifest
+    _available.clear()  # nur das zuletzt gewaehlte behalten (Arbeitsspeicher)
+    _available[key] = result
+    return result
+
+
 def forget(app_name):
     try:
         os.remove(_cache_path(app_name))

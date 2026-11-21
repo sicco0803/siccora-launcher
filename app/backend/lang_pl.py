@@ -125,5 +125,7 @@ TEXTS = {
     "Fertig – Nachkontrolle: {bad} von {n} Dateien waren fehlerhaft und wurden neu geladen.": "Gotowe – kontrola: {bad} z {n} plików było uszkodzonych i zostały pobrane ponownie.",
     "Fertig – Nachkontrolle: alle {n} geänderten Dateien sind in Ordnung.": "Gotowe – kontrola: wszystkie {n} zmienione pliki są w porządku.",
     "Fehlerhafte Dateien konnten nicht neu geladen werden – bitte „Prüfen“ ausführen.": "Nie udało się ponownie pobrać uszkodzonych plików – uruchom „Sprawdź”.",
-    "Bitte zuerst das Spiel installieren.": "Najpierw zainstaluj grę."
+    "Bitte zuerst das Spiel installieren.": "Najpierw zainstaluj grę.",
+    "Großes Paket – bereite Download speichersparend vor …": "Duży pakiet – przygotowywanie pobierania oszczędzającego pamięć …",
+    "Zu wenig Arbeitsspeicher für dieses Paket. Bitte andere Programme schließen oder weniger optionale Komponenten wählen.": "Za mało pamięci dla tego pakietu. Zamknij inne programy lub wybierz mniej komponentów opcjonalnych."
 }
