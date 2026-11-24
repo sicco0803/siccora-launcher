@@ -11,6 +11,7 @@
 """
 import collections
 import os
+import stat
 import sys
 import time
 
@@ -108,6 +109,8 @@ def verify_after(core, app, old_version=None):
             check = [f for f in files if old.get(f.filename) != f.sha_hash]
         else:
             print("Alte Dateiliste nicht gefunden - pruefe alle Dateien")
+    # Python-Zwischenspeicher (.pyc) schreibt der Unreal-Editor selbst neu - nicht pruefen (siehe lgd_run)
+    check = [f for f in check if not f.filename.lower().endswith(".pyc")]
     if not check:
         print("VERIFY_OK 0")
         return 0
@@ -269,6 +272,8 @@ def prune(core, app, removed):
             continue  # nie ausserhalb des Installationsordners
         if os.path.isfile(path):
             try:
+                if not os.stat(path).st_mode & stat.S_IWRITE:
+                    os.chmod(path, stat.S_IWRITE)  # Epic liefert Quelltext schreibgeschuetzt aus
                 os.remove(path)
                 done += 1
                 size += fm.file_size

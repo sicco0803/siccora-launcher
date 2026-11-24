@@ -52,6 +52,9 @@ RE_PRUNE = re.compile(r"^PRUNE (\d+)/(\d+)")
 # Pruefen ("Verify"): Legendary schreibt den Fortschritt mit \r in dieselbe Zeile
 RE_VERIFY = re.compile(r"Verification progress: (\d+)/(\d+) \(([\d.]+)%\) \[([\d.]+) MiB/s\]")
 RE_VERIFY_BAD = re.compile(r"File does not match hash|File is missing|treating file as missing")
+RE_REMOVING = re.compile(r'Removing ".*" from "(.+)"\.\.\.')
+RE_QUOTED = re.compile(r'"([^"]+)"\s*$')
+MAX_REPAIR_LIST = 20000  # mehr Dateinamen merkt sich der Launcher pro Auftrag nicht
 RE_WRITTEN = re.compile(r"Written: ([\d.]+) MiB")
 RE_DISK = re.compile(r"\+ Disk\s+- ([\d.]+) MiB/s \(write\) / ([\d.]+) MiB/s \(read\)")
 RE_CACHE = re.compile(r"Cache usage: ([\d.]+) MiB, active tasks: (\d+)")
@@ -102,7 +105,7 @@ class Downloads:
         with self._lock:
             out = []
             for j in self._jobs:
-                row = {k: v for k, v in j.items() if k != "log"}
+                row = {k: v for k, v in j.items() if k not in ("log", "repairFiles")}
                 row["message"] = tr(j["message"], **(j.get("msgVars") or {}))
                 row["label"] = tr(j["label"])
                 out.append(row)
@@ -113,6 +116,20 @@ class Downloads:
         with self._lock:
             job = self._get(job_id)
             return {"lines": list((job or {}).get("log") or [])[-lines:]}
+
+    def repair_files(self, job_id):
+        """Welche Dateien eine Pruefung neu geladen hat - mit Groesse auf der Platte."""
+        with self._lock:
+            job = self._get(job_id) or {}
+            files, base = list(job.get("repairFiles") or []), job.get("installPath") or ""
+        out = []
+        for path, reason in files:
+            try:
+                size = os.path.getsize(os.path.join(base, path)) if base else None
+            except OSError:
+                size = None
+            out.append({"path": path, "reason": reason, "size": size})
+        return {"files": out, "summary": job.get("repairSummary")}
 
     def paths_in_use(self):
         """Ordner, die offene Auftraege gerade als Quelle oder Ziel nutzen (Vault-Loeschsperre)."""
@@ -253,7 +270,7 @@ class Downloads:
                 job["message"] = ""
                 self._save()
             debuglog.job_start(job)
-            began = time.time()
+            began = job["runStart"] = time.time()
             try:
                 self._run(job)
             except Exception as e:  # nie den Arbeiter sterben lassen
@@ -261,6 +278,10 @@ class Downloads:
                 if job["status"] == "running":
                     job["status"], job["message"] = "failed", hide_servers(f"{type(e).__name__}: {e}")
             debuglog.job_end(job, time.time() - began)
+            job["activeS"] = (job.get("activeS") or 0) + time.time() - began  # Pausen zaehlen nicht mit
+            if job["status"] == "paused":  # Legendary zaehlt nach "Fortsetzen" wieder ab 0
+                job["dlBefore"] = (job.get("dlBefore") or 0) + (job.get("downloadedMb") or 0)
+                job["wrBefore"] = (job.get("wrBefore") or 0) + (job.get("writtenMb") or 0)
             with self._lock:
                 self._save()
             if self._on_change:
@@ -318,7 +339,7 @@ class Downloads:
                         os.remove(os.path.join(legendary_dir(), "tmp", f"{app}.repair"))
                     except OSError:
                         pass
-                    job.update(phase="verify", verifyBad=0, verifyNum=0, verifyTotal=0, readSpeed=0.0)
+                    job.update(phase="verify", verifyBad=0, verifyNum=0, verifyTotal=0, readSpeed=0.0, repairFiles=[])
             if job["action"] == "update" and "oldVersion" not in job:
                 # fuer die Nachkontrolle: nur pruefen, was das Update geschrieben hat (bleibt bei Pause erhalten)
                 job["oldVersion"] = _installed_version(app)
@@ -357,6 +378,8 @@ class Downloads:
             return
         if ok:
             job["status"], job["progress"] = "done", 100.0
+            _repair_summary(job)
+            _done_summary(job)
             if job.get("afterCheck") is not None and (job["afterCheck"] or job.get("verifyTotal")):
                 bad = job["afterCheck"]
                 job["message"] = ("Fertig – Nachkontrolle: {bad} von {n} Dateien waren fehlerhaft und wurden neu geladen."
@@ -367,6 +390,11 @@ class Downloads:
                 job["message"] = ("Fertig – {bad} von {n} Dateien waren defekt oder fehlten und wurden neu geladen."
                                   if bad else "Fertig – alle {n} Dateien sind in Ordnung.")
                 job["msgVars"] = {"bad": bad, "n": job["verifyTotal"]}
+            elif job["action"] == "uninstall" and job.get("deleteFailed"):
+                # Legendary meldet trotzdem "uninstalled" - der Nutzer soll wissen, dass Reste liegen
+                job["message"] = ("Entfernt – aber {n} Dateien ließen sich nicht löschen (vielleicht von einem "
+                                  "anderen Programm geöffnet). Bitte den Ordner von Hand löschen: {path}")
+                job["msgVars"] = {"n": job["deleteFailed"], "path": job.get("removePath") or ""}
             elif not job["message"].startswith(("Bereits", "Fertig – Versionsstand")):
                 job["message"] = "Fertig."
         else:
@@ -521,7 +549,7 @@ class Downloads:
     def _verify_after(self, job, app):
         """Nachkontrolle wie beim Epic Launcher; Fehlerhaftes wird gezielt neu geladen.
         Gibt False nur bei Pause/Abbruch oder wenn die Reparatur scheitert."""
-        job.update(phase="verify", verifyBad=0, verifyNum=0, verifyTotal=0, readSpeed=0.0, progress=0.0, eta="")
+        job.update(phase="verify", verifyBad=0, verifyNum=0, verifyTotal=0, readSpeed=0.0, progress=0.0, eta="", repairFiles=[])
         job["message"], job["msgVars"] = "Nachkontrolle: prüfe die geschriebenen Dateien …", {}
         cmd = BRIDGE + ["verify", app] + ([job["oldVersion"]] if job.get("oldVersion") else [])
         if not self._exec(job, cmd):
@@ -538,7 +566,12 @@ class Downloads:
             return True
         job.update(phase=None, progress=0.0)
         job["message"], job["msgVars"] = "Lade {n} fehlerhafte Dateien neu …", {"n": bad}
+        job["inAfterCheck"] = True
+        dl, wr = job.get("downloadedMb") or 0, job.get("writtenMb") or 0
         ok = self._exec(job, LEGENDARY + ["-y", "install", app, "--repair", "--skip-sdl", "--skip-dlcs"] + _workers())
+        job.pop("inAfterCheck", None)
+        # die Reparatur meldet ihre eigenen Zaehler - fuer die Abschlusszeile zur Installation dazurechnen
+        job["downloadedMb"], job["writtenMb"] = dl + (job.get("downloadedMb") or 0), wr + (job.get("writtenMb") or 0)
         if not ok and not self._stopped(job):
             self._fail(job, "Fehlerhafte Dateien konnten nicht neu geladen werden – bitte „Prüfen“ ausführen.")
         return ok
@@ -585,6 +618,12 @@ class Downloads:
             return
         if line.startswith("EGL_BUSY"):
             job["eglBusy"] = True
+        if line.startswith("SICCORA_FILES "):
+            # setzen statt addieren: ein neuer Versuch analysiert dieselben Dateien noch einmal;
+            # die Reparatur der Nachkontrolle zaehlt nicht zur eigentlichen Installation
+            if not job.get("inAfterCheck"):
+                job["filesWritten"] = int(line.split()[1]) + (job.get("resumedFiles") or 0)
+            return
         if m := RE_MOVE.search(line):
             done, total = int(m.group(1)), int(m.group(2))
             job["progress"] = 100.0 * done / max(total, 1)
@@ -615,8 +654,15 @@ class Downloads:
                 job["verifyTotal"] = job.get("verifyTotal") or int(line.split()[1])
         elif line.startswith("ADOPT_"):
             job["adoptResult"] = {"ADOPT_WRONG_FOLDER": "wrong", "ADOPT_NEEDS_VERIFY": "verify"}.get(line.strip(), "ok")
+        elif "Failed deleting file" in line:
+            job["deleteFailed"] = (job.get("deleteFailed") or 0) + 1
+        elif m := RE_REMOVING.search(line):
+            job["removePath"] = m.group(1)
         elif RE_VERIFY_BAD.search(line):
             job["verifyBad"] = (job.get("verifyBad") or 0) + 1
+            files = job.setdefault("repairFiles", [])
+            if (q := RE_QUOTED.search(line)) and len(files) < MAX_REPAIR_LIST:
+                files.append([q.group(1), "missing" if "missing" in line else "hash"])
         elif "Verification finished successfully" in line:
             job["verified"] = True
             job["message"] = "Prüfung fertig – alles in Ordnung."
@@ -637,6 +683,7 @@ class Downloads:
             job["progress"], job["eta"] = base + (100.0 - base) * float(m.group(1)) / 100.0, m.group(2)
             job["message"] = "Lädt defekte und fehlende Dateien neu …" if job["action"] == "repair" else "Lädt herunter …"
         elif m := RE_RESUMED.search(line):
+            job["resumedFiles"] = int(m.group(1))  # nach Pause schon fertig - zaehlen zur Abschlusszeile mit
             job["message"], job["msgVars"] = "Setze fort – {n} Dateien waren schon fertig …", {"n": m.group(1)}
         elif m := RE_SPEED.search(line):
             job["speed"] = float(m.group(1))
@@ -665,6 +712,36 @@ class Downloads:
                               if job["action"] == "update" else "Bereits aktuell – nichts zu tun.")
         elif "Waiting for installation to finish" in line:
             job["message"] = "Schließe Installation ab …"
+
+
+def _done_summary(job):
+    """Abschlusszeile nach Installieren/Update: Dateien, geladen, geschrieben, Dauer (ohne Pausen)."""
+    if job["action"] not in ("install", "update") or not job.get("filesWritten"):
+        return
+    job["doneSummary"] = {"files": job["filesWritten"],
+                          "downloadedMb": round((job.get("downloadedMb") or 0) + (job.get("dlBefore") or 0), 1),
+                          "writtenMb": round((job.get("writtenMb") or 0) + (job.get("wrBefore") or 0), 1),
+                          "seconds": round((job.get("activeS") or 0) + time.time() - (job.get("runStart") or time.time()))}
+    debuglog.log("job", "Abschluss", app=job.get("appName"), **job["doneSummary"])
+
+
+def _repair_summary(job):
+    """Kurzfassung fuer die Anzeige: wie viele Dateien neu geladen, wie gross (Platte), wie viel Download."""
+    files = job.get("repairFiles") or []
+    if not files:
+        return
+    base, total = job.get("installPath") or "", 0
+    for path, _reason in files:
+        try:
+            total += os.path.getsize(os.path.join(base, path)) if base else 0
+        except OSError:
+            pass
+    job["repairSummary"] = {
+        "files": len(files), "missing": sum(1 for _p, r in files if r == "missing"),
+        "cache": sum(1 for p, _r in files if p.lower().endswith(".pyc")),
+        "sizeMb": round(total / 1048576, 2), "downloadedMb": round(job.get("downloadedMb") or 0, 2),
+        "notListed": max(0, (job.get("verifyBad") or 0) - len(files))}
+    debuglog.log("job", "Neu geladen", app=job.get("appName"), **job["repairSummary"])
 
 
 def _load_jobs():

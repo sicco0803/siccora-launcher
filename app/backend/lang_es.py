@@ -127,5 +127,6 @@ TEXTS = {
     "Fehlerhafte Dateien konnten nicht neu geladen werden – bitte „Prüfen“ ausführen.": "No se pudieron volver a descargar los archivos defectuosos: ejecuta «Comprobar».",
     "Bitte zuerst das Spiel installieren.": "Instala primero el juego.",
     "Großes Paket – bereite Download speichersparend vor …": "Paquete grande: preparando una descarga que ahorra memoria …",
-    "Zu wenig Arbeitsspeicher für dieses Paket. Bitte andere Programme schließen oder weniger optionale Komponenten wählen.": "No hay suficiente memoria para este paquete. Cierra otros programas o elige menos componentes opcionales."
+    "Zu wenig Arbeitsspeicher für dieses Paket. Bitte andere Programme schließen oder weniger optionale Komponenten wählen.": "No hay suficiente memoria para este paquete. Cierra otros programas o elige menos componentes opcionales.",
+    "Entfernt – aber {n} Dateien ließen sich nicht löschen (vielleicht von einem anderen Programm geöffnet). Bitte den Ordner von Hand löschen: {path}": "Eliminado, pero no se pudieron borrar {n} archivos (quizá estén abiertos en otro programa). Borra la carpeta a mano: {path}",
 }

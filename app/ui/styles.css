@@ -107,11 +107,13 @@ input:focus, select:focus, textarea:focus { border-color: var(--brand); }
 .grid.wide { grid-template-columns: repeat(auto-fill, minmax(232px, 1fr)); }
 .card { background: var(--surface); border: 1px solid var(--line-soft); display: flex; flex-direction: column;
   content-visibility: auto; contain-intrinsic-size: auto 340px; /* Karten ausserhalb des Sichtfelds nicht zeichnen */
-  transition: border-color .15s, transform .2s var(--ease); }
-.card:hover { border-color: var(--line); transform: translateY(-2px); }
+  transition: border-color .15s; }
+/* Hover wie bei den Engine-Kacheln: die Karte bleibt stehen, nur das Titelbild zoomt leicht */
+.card:hover { border-color: var(--line); }
 .card .img { aspect-ratio: 3 / 4; background: var(--raised) center / cover no-repeat; position: relative; }
 .grid.wide .card .img { aspect-ratio: 16 / 10; }
-.card .img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.card .img img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .5s var(--ease); }
+.card:hover .img img { transform: scale(1.03); }
 .card .body { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
 .card .title { font-weight: 400; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2;
   -webkit-box-orient: vertical; overflow: hidden; }
@@ -261,6 +263,16 @@ ul.plain { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 4p
   border: 1px solid var(--line-soft); padding: 8px 10px; font: 11px/1.45 ui-monospace, Consolas, monospace;
   color: var(--muted); white-space: pre-wrap; word-break: break-all; }
 .btn.small.active { border-color: var(--brand); color: var(--ink); }
+.job .repairsum { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; }
+.link-btn { all: unset; cursor: pointer; color: var(--brand); font-weight: 600; font-size: 12px; }
+.link-btn:hover { text-decoration: underline; }
+.repairlist { grid-column: 1 / -1; margin: 6px 0 0; max-height: 320px; overflow: auto; background: var(--raised); border: 1px solid var(--line-soft); }
+.repairlist table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.repairlist th { position: sticky; top: 0; background: var(--raised); text-align: left; color: var(--muted); font-weight: 600; padding: 6px 10px; border-bottom: 1px solid var(--line); }
+.repairlist td { padding: 3px 10px; border-bottom: 1px solid var(--line-soft); color: var(--muted); }
+.repairlist .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.repairlist .rf-path { font: 11px ui-monospace, Consolas, monospace; color: var(--ink); word-break: break-all; }
+.rf-hint { margin: 8px 10px; font-size: 12px; color: var(--muted); }
 /* Fab: Typ und Kategorie */
 .card .cat { font-size: 11px; color: var(--faint); }
 .card .cat .link { font-size: 11px; text-decoration: none; color: var(--muted); }
@@ -303,7 +315,7 @@ button.tile:hover { border-color: var(--brand); }
   border: 1px solid var(--line-soft); }
 @keyframes flash { from { background: var(--raised); box-shadow: inset 0 0 0 1px var(--brand); } }
 .flash { animation: flash 1.8s var(--ease); }
-@media (prefers-reduced-motion: reduce) { .tile .img img, .flash { transition: none; animation: none; } }
+@media (prefers-reduced-motion: reduce) { .tile .img img, .card .img img, .flash { transition: none; animation: none; } }
 
 /* Passt sich der Fenstergroesse an (Mindestgroesse des Fensters: 960 x 600) */
 body { grid-template-columns: clamp(184px, 15vw, 248px) minmax(0, 1fr); }

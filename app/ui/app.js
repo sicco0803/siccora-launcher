@@ -11,7 +11,7 @@ function thumb(url, width = 336) {
   return url.includes('cdn1.epicgames.com') && !url.includes('?') ? `${url}?h=${Math.round(width * 4 / 3)}&w=${width}&resize=1&quality=medium` : url;
 }
 
-const state = { openLogs: new Set(), logs: {}, fabTab: 'library', local: null, view: 'home', library: null, fab: null, projects: null, thumbs: {}, fabProject: null, shown: 0, list: [] };
+const state = { openLogs: new Set(), logs: {}, openRepair: new Set(), repair: {}, fabTab: 'library', local: null, view: 'home', library: null, fab: null, projects: null, thumbs: {}, fabProject: null, shown: 0, list: [] };
 let api;
 
 // Deutsche Texte sind die Uebersetzungs-Schluessel (siehe i18n.js)
@@ -277,18 +277,23 @@ function itemActions(i, extra = '', tile = false) {
       <span class="more-menu" role="menu" hidden>${menu}</span></span>`;
 }
 
-// Menue "⋯" oeffnen/schliessen - feste Position, damit es nicht an der Kachel abgeschnitten wird
+// Menue "⋯" oeffnen/schliessen. Offen haengt es direkt am <body>: in der Kachel wuerde es von deren
+// Zeichen-Optimierung (content-visibility) abgeschnitten bzw. von der Hover-Verschiebung mitbewegt.
 function closeMoreMenus() {
   document.querySelectorAll('.more-menu:not([hidden])').forEach((m) => {
     m.hidden = true;
-    m.previousElementSibling?.setAttribute('aria-expanded', 'false');
+    const btn = m.moreBtn;
+    btn?.setAttribute('aria-expanded', 'false');
+    if (btn?.isConnected) btn.after(m); else m.remove();  // zurueck in die Kachel (oder weg, wenn neu gezeichnet)
   });
 }
 function toggleMore(btn) {
   const menu = btn.nextElementSibling;
-  const open = menu.hidden;
+  const open = !!menu && menu.hidden;
   closeMoreMenus();
   if (!open) return;
+  menu.moreBtn = btn;
+  document.body.appendChild(menu);
   menu.hidden = false;
   btn.setAttribute('aria-expanded', 'true');
   const r = btn.getBoundingClientRect();
@@ -296,7 +301,7 @@ function toggleMore(btn) {
   menu.style.left = `${Math.max(8, r.left + w + 8 <= innerWidth ? r.left : r.right - w)}px`;  // nach rechts, sonst nach links
   menu.style.top = `${r.bottom + h + 6 > innerHeight ? r.top - h - 4 : r.bottom + 4}px`;
 }
-document.addEventListener('click', (e) => { if (!e.target.closest('.more')) closeMoreMenus(); });
+document.addEventListener('click', (e) => { if (!e.target.closest('.more, .more-menu')) closeMoreMenus(); });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMoreMenus(); });
 window.addEventListener('resize', closeMoreMenus);
 document.addEventListener('scroll', closeMoreMenus, true);
@@ -403,7 +408,7 @@ function projectCard(p) {
     <div class="img">${img}
       <div class="card-corner">
         <button class="corner-btn" data-hide-project="${up}" data-name="${esc(p.displayName)}" title="${esc(t('Nur aus dieser Liste nehmen. Das Projekt bleibt auf der Festplatte.'))}">${esc(t('Ausblenden'))}</button>
-        ${p.deleteBlock ? '' : `<button class="corner-btn danger" data-delete-project="${up}" title="${esc(t('Projektordner von der Festplatte in den Papierkorb verschieben'))}">${esc(t('Projekt löschen'))}</button>`}
+        ${p.deleteBlock ? '' : `<button class="corner-btn danger" data-delete-project="${up}" title="${esc(t('Projektordner von der Festplatte löschen'))}">${esc(t('Projekt löschen'))}</button>`}
       </div></div>
     <div class="body">
       <div class="title-row"><div class="title" title="${esc(p.description || p.displayName)}">${esc(p.displayName)}</div>
@@ -429,7 +434,13 @@ async function loadThumbs() {
       const { url } = await call('project_thumb', key);
       if (!url) continue;
       state.thumbs[key] = url;
-      (card.querySelector('.img') || card).innerHTML = `<img src="${esc(url)}" alt="">`;
+      // nur Platzhalter/Bild tauschen - Knoepfe im Bildbereich (Ausblenden, Loeschen) bleiben stehen
+      const box = card.querySelector('.img') || card;
+      const img = document.createElement('img');
+      img.src = url;
+      img.alt = '';
+      const old = box.querySelector(':scope > img, :scope > .initial, :scope > .engine-art');
+      if (old) old.replaceWith(img); else box.prepend(img);
     } catch { /* ohne Bild weiter */ }
   }
 }
@@ -627,7 +638,9 @@ async function loadStorage() {
     el.innerHTML = s.drives.map((d) => `<div class="status-job">
         <div class="status-row"><span class="tile-title">${esc(d.drive)}</span><span class="tile-sub">${esc(t('{free} GB von {total} GB frei', { free: d.freeGb, total: d.totalGb }))}</span></div>
         <div class="track"><div class="fill ${d.usedPct >= 90 ? 'full' : ''}" style="width:${d.usedPct}%"></div></div></div>`).join('') +
-      `<button class="status-link" data-go-local="1"><span>${esc(t('Fab-Downloads'))}</span><span class="tile-size">${esc(mb(s.vaultMb))}</span></button>`;
+      `<button class="status-link" data-go-local="1"><span>${esc(t('Fab-Downloads'))}</span><span class="tile-size">${esc(mb(s.vaultMb))}</span></button>` +
+      // mehrfach gefragt: "warum so wenige Laufwerke?" - es sind bewusst nur die, die der Launcher nutzt
+      `<p class="status-note">${esc(t('Gezeigt werden nur Laufwerke, auf denen Spiele, Engines, DevKits oder Fab-Downloads liegen – und das Laufwerk für neue Installationen.'))}</p>`;
   } catch { /* Startseite funktioniert auch ohne */ }
 }
 
@@ -724,6 +737,46 @@ function activity(j) {
   return t('Arbeitet … (Details unter „Aktivität“)');
 }
 
+// Nach dem Pruefen: welche Dateien neu geladen wurden, wie viele, wie gross
+const fileSize = (b) => (b == null ? '–' : b >= 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
+function repairInfo(j) {
+  const r = j.repairSummary;
+  if (!r || !r.files) return '';
+  const open = state.openRepair.has(j.id);
+  let txt = t('{n} Dateien neu geladen ({bad} defekt, {missing} fehlten) · Download {dl} · auf der Platte {size}', {
+    n: n0(r.files + (r.notListed || 0)), bad: n0(r.files - r.missing), missing: n0(r.missing),
+    dl: mb(r.downloadedMb || 0), size: `${(r.sizeMb || 0).toFixed(1)} MB` });
+  if (r.cache) txt += ` · ${t('davon {n} Python-Cache-Dateien (.pyc)', { n: n0(r.cache) })}`;
+  let list = '';
+  if (open) {
+    const d = state.repair[j.id];
+    if (!d) list = `<pre class="joblog">${esc(t('Lade Liste …'))}</pre>`;
+    else {
+      const rows = d.files.map((f) => `<tr><td class="rf-path" title="${esc(f.path)}">${esc(f.path)}</td>
+        <td>${esc(t(f.reason === 'missing' ? 'fehlte' : 'defekt'))}</td><td class="num">${esc(fileSize(f.size))}</td></tr>`).join('');
+      const hint = r.cache ? `<p class="rf-hint">${esc(t('Python-Cache-Dateien (.pyc) legt der DevKit-Editor beim Start neu an – sie gelten danach als „defekt“, sind aber harmlos.'))}</p>` : '';
+      const more = r.notListed ? `<p class="rf-hint">${esc(t('{n} weitere Dateien sind nicht aufgelistet.', { n: n0(r.notListed) }))}</p>` : '';
+      list = `<div class="repairlist" data-job="${j.id}">${hint}<table><thead><tr><th>${esc(t('Datei'))}</th><th>${esc(t('Grund'))}</th>
+        <th class="num">${esc(t('Größe'))}</th></tr></thead><tbody>${rows}</tbody></table>${more}</div>`;
+    }
+  }
+  return `<div class="activity repairsum">${esc(txt)}
+    <button class="link-btn" data-repair-toggle="${j.id}">${esc(t(open ? 'Liste ausblenden' : 'Dateien anzeigen'))}</button></div>${list}`;
+}
+
+// Abschlusszeile nach Installieren/Update
+function duration(sec) {
+  if (sec < 60) return t('{n} Sek.', { n: Math.max(1, Math.round(sec)) });
+  if (sec < 3600) return t('{n} Min.', { n: Math.round(sec / 60) });
+  return t('{h} Std. {m} Min.', { h: Math.floor(sec / 3600), m: Math.round((sec % 3600) / 60) });
+}
+function doneInfo(j) {
+  const d = j.doneSummary;
+  if (!d) return '';
+  return `<div class="activity">${esc(t('{files} Dateien · {dl} heruntergeladen · {written} geschrieben · {time}', {
+    files: n0(d.files), dl: mb(d.downloadedMb || 0), written: mb(d.writtenMb || 0), time: duration(d.seconds || 0) }))}</div>`;
+}
+
 function jobRow(j) {
   const size = j.downloadMb ? ` · ${t('{a} von {b}', { a: mb(j.downloadedMb), b: mb(j.downloadMb) })}` : '';
   const live = j.status === 'running' && j.progress > 0 && j.phase !== 'verify' ? ` · ${j.speed.toFixed(1)} MB/s · ${t('noch {eta}', { eta: j.eta })}` : '';
@@ -744,6 +797,7 @@ function jobRow(j) {
     ${bar ? `<div class="track"><div class="fill" style="width:${j.progress}%"></div></div>` : ''}
     <div class="msg">${esc(j.message)}${bar ? esc(` ${Math.floor(j.progress)} %${j.phase === 'verify' ? '' : size}${j.status === 'running' ? live : ''}`) : ''}</div>
     ${j.status === 'running' ? `<div class="activity">${esc(activity(j))}</div>` : ''}
+    ${j.status === 'done' ? repairInfo(j) + doneInfo(j) : ''}
     ${logOpen ? `<pre class="joblog">${esc((state.logs[j.id] || []).join('\n') || t('Noch keine Ausgabe.'))}</pre>` : ''}
   </div>`;
 }
@@ -1181,7 +1235,7 @@ $('#fab-go').onclick = async () => {
   } catch (err) { toast(err.message); }
 };
 
-// --- Projekt loeschen: pruefen -> Uebersicht -> Namen eintippen -> Papierkorb ---------
+// --- Projekt loeschen: pruefen -> Uebersicht -> Namen eintippen -> loeschen (Papierkorb, falls an) ---
 const delDlg = { uproject: null, name: null };
 
 async function openDelete(uproject) {
@@ -1207,7 +1261,7 @@ async function openDelete(uproject) {
       <dt>${esc(t('Ordner'))}</dt><dd><code>${esc(info.dir)}</code></dd>
       <dt>${esc(t('Inhalt'))}</dt><dd>${esc(t('{n} Dateien · {size}', { n: info.files, size: mb(info.sizeMb) }))}</dd>
       <dt></dt><dd class="sub">${info.top.map(esc).join(' · ')}${info.topMore ? ` · ${esc(t('und {n} weitere', { n: info.topMore }))}` : ''}</dd></dl>
-    <p class="note">${esc(t('Der komplette Projektordner wird in den Papierkorb verschoben – mit allem, was darin liegt, auch eigenen Dateien. Passt er nicht in den Papierkorb, fragt Windows, ob endgültig gelöscht werden soll.'))}</p>
+    <p class="note">${esc(t('Der komplette Projektordner wird gelöscht – mit allem, was darin liegt, auch eigenen Dateien. Ist der Windows-Papierkorb eingeschaltet, landet er dort, sonst ist er endgültig weg.'))}</p>
     <label class="field"><span>${esc(t('Zur Bestätigung den Projektnamen eintippen:'))}</span> <code class="confirm-name">${esc(info.name)}</code>
       <input id="del-confirm" type="text" autocomplete="off" spellcheck="false"></label>`;
   $('#del-go').hidden = false;
@@ -1230,7 +1284,7 @@ $('#del-go').onclick = async () => {
       return;
     }
     $('#deldlg').hidden = true;
-    toast(t('„{name}“ wurde in den Papierkorb verschoben ({size} frei).', { name: delDlg.shown, size: mb(res.sizeMb || 0) }));
+    toast(t('„{name}“ wurde gelöscht ({size} frei).', { name: delDlg.shown, size: mb(res.sizeMb || 0) }));
     state.projects = await call('projects');
     render();
   } catch (err) {
@@ -1582,6 +1636,9 @@ async function render() {
     for (const id of state.openLogs) {
       try { state.logs[id] = (await call('download_log', id)).lines; } catch { /* weiter */ }
     }
+    // Dateiliste nach dem Pruefen: Scrollstand beim sekuendlichen Neuzeichnen behalten
+    const keepScroll = {};
+    document.querySelectorAll('.repairlist[data-job]').forEach((el) => { keepScroll[el.dataset.job] = el.scrollTop; });
     $('#meta').textContent = jobs.length ? t('{n} aktiv', { n: jobs.filter((j) => j.status === 'queued' || j.status === 'running').length }) : '';
     $('#content').innerHTML = `
       <div class="settings-line">${esc(t('Neue Installationen landen in'))}
@@ -1591,6 +1648,7 @@ async function render() {
       </div>
       <div class="rows">${jobs.length ? [...jobs].reverse().map(jobRow).join('') : `<p class="empty">${esc(t('Keine Downloads.'))}</p>`}</div>`;
     document.querySelectorAll('.joblog').forEach((el) => { el.scrollTop = el.scrollHeight; }); // neueste Zeile sichtbar
+    document.querySelectorAll('.repairlist[data-job]').forEach((el) => { el.scrollTop = keepScroll[el.dataset.job] || 0; });
     return;
   }
 
@@ -2235,6 +2293,16 @@ $('#content').addEventListener('click', async (e) => {
       if (!(await askConfirm(t('Wirklich abbrechen?\n\n{what}\n\nZum späteren Weitermachen stattdessen „Pause“ nutzen.', { what: what ? t(what) : '' }), { ok: 'Ja, abbrechen', cancel: 'Weitermachen', danger: true }))) return;
       await call('cancel_download', Number(b.dataset.cancel));
       await pollDownloads.once();
+    }
+    else if (b.dataset.repairToggle) {
+      const id = Number(b.dataset.repairToggle);
+      if (state.openRepair.has(id)) state.openRepair.delete(id);
+      else {
+        state.openRepair.add(id);
+        render();
+        try { state.repair[id] = await call('download_repair_files', id); } catch (err) { state.openRepair.delete(id); toast(err.message); }
+      }
+      render();
     }
     else if (b.dataset.logToggle) {
       const id = Number(b.dataset.logToggle);

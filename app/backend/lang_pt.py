@@ -127,5 +127,6 @@ TEXTS = {
     "Fehlerhafte Dateien konnten nicht neu geladen werden – bitte „Prüfen“ ausführen.": "Não foi possível transferir de novo os ficheiros com defeito – executa «Verificar».",
     "Bitte zuerst das Spiel installieren.": "Instala primeiro o jogo.",
     "Großes Paket – bereite Download speichersparend vor …": "Pacote grande – a preparar uma transferência que poupa memória …",
-    "Zu wenig Arbeitsspeicher für dieses Paket. Bitte andere Programme schließen oder weniger optionale Komponenten wählen.": "Memória insuficiente para este pacote. Feche outros programas ou escolha menos componentes opcionais."
+    "Zu wenig Arbeitsspeicher für dieses Paket. Bitte andere Programme schließen oder weniger optionale Komponenten wählen.": "Memória insuficiente para este pacote. Feche outros programas ou escolha menos componentes opcionais.",
+    "Entfernt – aber {n} Dateien ließen sich nicht löschen (vielleicht von einem anderen Programm geöffnet). Bitte den Ordner von Hand löschen: {path}": "Removido – mas {n} arquivos não puderam ser apagados (talvez abertos por outro programa). Apague a pasta manualmente: {path}",
 }

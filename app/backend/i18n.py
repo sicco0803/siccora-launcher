@@ -177,6 +177,7 @@ EN = {
     "Bitte zuerst das Spiel installieren.": "Please install the game first.",
     "Großes Paket – bereite Download speichersparend vor …": "Large package – preparing a memory-saving download …",
     "Zu wenig Arbeitsspeicher für dieses Paket. Bitte andere Programme schließen oder weniger optionale Komponenten wählen.": "Not enough memory for this package. Please close other programs or choose fewer optional components.",
+    "Entfernt – aber {n} Dateien ließen sich nicht löschen (vielleicht von einem anderen Programm geöffnet). Bitte den Ordner von Hand löschen: {path}": "Removed – but {n} files could not be deleted (maybe opened by another program). Please delete the folder manually: {path}",
 }
 
 LANGUAGES = ("de", "en", "fr", "es", "it", "pl", "pt", "nl")

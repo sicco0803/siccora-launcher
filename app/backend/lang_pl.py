@@ -127,5 +127,6 @@ TEXTS = {
     "Fehlerhafte Dateien konnten nicht neu geladen werden – bitte „Prüfen“ ausführen.": "Nie udało się ponownie pobrać uszkodzonych plików – uruchom „Sprawdź”.",
     "Bitte zuerst das Spiel installieren.": "Najpierw zainstaluj grę.",
     "Großes Paket – bereite Download speichersparend vor …": "Duży pakiet – przygotowywanie pobierania oszczędzającego pamięć …",
-    "Zu wenig Arbeitsspeicher für dieses Paket. Bitte andere Programme schließen oder weniger optionale Komponenten wählen.": "Za mało pamięci dla tego pakietu. Zamknij inne programy lub wybierz mniej komponentów opcjonalnych."
+    "Zu wenig Arbeitsspeicher für dieses Paket. Bitte andere Programme schließen oder weniger optionale Komponenten wählen.": "Za mało pamięci dla tego pakietu. Zamknij inne programy lub wybierz mniej komponentów opcjonalnych.",
+    "Entfernt – aber {n} Dateien ließen sich nicht löschen (vielleicht von einem anderen Programm geöffnet). Bitte den Ordner von Hand löschen: {path}": "Usunięto – ale {n} plików nie dało się skasować (może są otwarte w innym programie). Usuń folder ręcznie: {path}",
 }

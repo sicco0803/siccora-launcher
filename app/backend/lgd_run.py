@@ -9,6 +9,7 @@ geholt, Engines eingeschlossen. Aufruf wie das normale legendary-Programm:
 """
 import json
 import os
+import stat
 import sys
 import time
 
@@ -153,6 +154,10 @@ def _run_analysis_without_tag_deletes(self, *args, **kwargs):
             self.tasks.clear()
             self.tasks.extend(keep)
             print(f"[Siccora] {dropped} Loeschauftraege fuer nicht gewaehlte Komponenten verworfen")
+    # fuer die Abschlusszeile im Launcher: wie viele Dateien dieser Lauf schreibt
+    written = sum(1 for t in self.tasks if isinstance(t, FileTask)
+                  and t.flags & (TaskFlags.OPEN_FILE | TaskFlags.CREATE_EMPTY_FILE))
+    print(f"SICCORA_FILES {written}", flush=True)
     return result
 
 
@@ -208,6 +213,57 @@ def _no_dlc_lookup(self, app_name, platform="Windows"):
     # DLC-Dateien im Spielordner und gehen mit ihm weg.
     return []
 
+
+def is_cache_file(path):
+    """Python-Zwischenspeicher (.pyc): legt der Unreal-Editor bei jedem Start neu an. Beim Pruefen
+    zaehlen sie sonst immer als "defekt" und werden sinnlos neu geladen - das verwirrt nur."""
+    return path.lower().endswith(".pyc")
+
+
+def _validate_without_cache(base_path, filelist, *args, **kwargs):
+    """Wie Legendarys validate_files, aber .pyc gelten ungeprueft als in Ordnung (mit Epics
+    Pruefsumme - so laedt die anschliessende Reparatur sie auch nicht neu)."""
+    from legendary.models.game import VerifyResult
+    keep = []
+    for path, sha in filelist:
+        if is_cache_file(path):
+            yield VerifyResult.HASH_MATCH, path, sha, 0
+        else:
+            keep.append((path, sha))
+    yield from _validate_files(base_path, keep, *args, **kwargs)
+
+
+def _writable(full):
+    """Schreibschutz entfernen. Epic liefert z. B. den Engine-Quelltext (.h/.cpp/.cs) schreibgeschuetzt
+    aus - Legendarys os.remove scheitert daran mit "Access is denied" (Deinstallieren liess bei
+    UE 5.5 ueber 60 000 Dateien liegen)."""
+    try:
+        if not os.stat(full).st_mode & stat.S_IWRITE:
+            os.chmod(full, stat.S_IWRITE | stat.S_IREAD)
+    except OSError:
+        pass
+
+
+def _delete_filelist(path, filenames, *args, **kwargs):
+    for name in filenames:
+        _writable(os.path.join(path, name))
+    return _orig_delete_filelist(path, filenames, *args, **kwargs)
+
+
+def _delete_folder(path, recursive=True):
+    if recursive and os.path.isdir(path):
+        for root, _dirs, files in os.walk(path):
+            for name in files:
+                _writable(os.path.join(root, name))
+    return _orig_delete_folder(path, recursive)
+
+
+_orig_delete_filelist, _orig_delete_folder = lcore.delete_filelist, lcore.delete_folder
+lcore.delete_filelist, lcore.delete_folder = _delete_filelist, _delete_folder
+
+import legendary.cli as lcli  # noqa: E402
+_validate_files = lcli.validate_files
+lcli.validate_files = _validate_without_cache
 
 lcore.LegendaryCore.get_game = _get_game
 lcore.LegendaryCore.get_cdn_manifest = _cdn_manifest

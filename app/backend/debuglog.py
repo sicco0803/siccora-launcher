@@ -83,10 +83,17 @@ def job_line(job, line):
             pass
 
 
+def _fill(msg, values):
+    try:
+        return str(msg or "").format(**(values or {})) if values else msg
+    except (KeyError, IndexError, ValueError):
+        return msg
+
+
 def job_end(job, seconds):
     if ENABLED:
         log("job", "Ende", id=job["id"], app=job.get("appName"), action=job.get("action"), status=job.get("status"),
-            message=job.get("message"), s=round(seconds, 1))
+            message=_fill(job.get("message"), job.get("msgVars")), s=round(seconds, 1))
         _job_files.pop(job["id"], None)
 
 

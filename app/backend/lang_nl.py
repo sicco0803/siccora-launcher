@@ -127,5 +127,6 @@ TEXTS = {
     "Fehlerhafte Dateien konnten nicht neu geladen werden – bitte „Prüfen“ ausführen.": "Defecte bestanden konden niet opnieuw worden gedownload – voer \"Controleren\" uit.",
     "Bitte zuerst das Spiel installieren.": "Installeer eerst de game.",
     "Großes Paket – bereite Download speichersparend vor …": "Groot pakket – geheugenbesparende download wordt voorbereid …",
-    "Zu wenig Arbeitsspeicher für dieses Paket. Bitte andere Programme schließen oder weniger optionale Komponenten wählen.": "Te weinig geheugen voor dit pakket. Sluit andere programma’s of kies minder optionele onderdelen."
+    "Zu wenig Arbeitsspeicher für dieses Paket. Bitte andere Programme schließen oder weniger optionale Komponenten wählen.": "Te weinig geheugen voor dit pakket. Sluit andere programma’s of kies minder optionele onderdelen.",
+    "Entfernt – aber {n} Dateien ließen sich nicht löschen (vielleicht von einem anderen Programm geöffnet). Bitte den Ordner von Hand löschen: {path}": "Verwijderd – maar {n} bestanden konden niet worden gewist (misschien geopend door een ander programma). Verwijder de map handmatig: {path}",
 }

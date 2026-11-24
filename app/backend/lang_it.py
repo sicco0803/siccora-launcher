@@ -127,5 +127,6 @@ TEXTS = {
     "Fehlerhafte Dateien konnten nicht neu geladen werden – bitte „Prüfen“ ausführen.": "Impossibile riscaricare i file difettosi: esegui «Verifica».",
     "Bitte zuerst das Spiel installieren.": "Installa prima il gioco.",
     "Großes Paket – bereite Download speichersparend vor …": "Pacchetto grande – preparazione di un download a basso uso di memoria …",
-    "Zu wenig Arbeitsspeicher für dieses Paket. Bitte andere Programme schließen oder weniger optionale Komponenten wählen.": "Memoria insufficiente per questo pacchetto. Chiudi altri programmi o scegli meno componenti opzionali."
+    "Zu wenig Arbeitsspeicher für dieses Paket. Bitte andere Programme schließen oder weniger optionale Komponenten wählen.": "Memoria insufficiente per questo pacchetto. Chiudi altri programmi o scegli meno componenti opzionali.",
+    "Entfernt – aber {n} Dateien ließen sich nicht löschen (vielleicht von einem anderen Programm geöffnet). Bitte den Ordner von Hand löschen: {path}": "Rimosso, ma {n} file non sono stati eliminati (forse aperti da un altro programma). Elimina la cartella manualmente: {path}",
 }

@@ -127,5 +127,6 @@ TEXTS = {
     "Fehlerhafte Dateien konnten nicht neu geladen werden – bitte „Prüfen“ ausführen.": "Impossible de retélécharger les fichiers défectueux – lancez « Vérifier ».",
     "Bitte zuerst das Spiel installieren.": "Veuillez d’abord installer le jeu.",
     "Großes Paket – bereite Download speichersparend vor …": "Gros paquet – préparation d’un téléchargement économe en mémoire …",
-    "Zu wenig Arbeitsspeicher für dieses Paket. Bitte andere Programme schließen oder weniger optionale Komponenten wählen.": "Mémoire insuffisante pour ce paquet. Fermez d’autres programmes ou choisissez moins de composants optionnels."
+    "Zu wenig Arbeitsspeicher für dieses Paket. Bitte andere Programme schließen oder weniger optionale Komponenten wählen.": "Mémoire insuffisante pour ce paquet. Fermez d’autres programmes ou choisissez moins de composants optionnels.",
+    "Entfernt – aber {n} Dateien ließen sich nicht löschen (vielleicht von einem anderen Programm geöffnet). Bitte den Ordner von Hand löschen: {path}": "Supprimé – mais {n} fichiers n’ont pas pu être effacés (peut-être ouverts par un autre programme). Veuillez supprimer le dossier manuellement : {path}",
 }
