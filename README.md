@@ -77,6 +77,14 @@ Releases are code-signed (publisher: Open Source Developer Mike Rieckhoff).
 Windows SmartScreen may still warn while a new release builds up reputation
 ("More info" → "Run anyway").
 
+### Linux or macOS?
+
+Siccora Launcher is Windows-only for now. A Linux version (and maybe macOS) is
+on the idea list – focused on Unreal Engine, Fab assets and projects, since
+DevKits are Windows-only. **Would you use it?** Tell us in
+[this discussion](https://github.com/sicco0803/siccora-launcher/discussions/1) –
+it helps decide whether it gets built.
+
 ## Development
 
 Siccora Launcher is designed, directed and tested by me. Much of the code was
