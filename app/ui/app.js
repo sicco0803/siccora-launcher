@@ -302,6 +302,17 @@ function toggleMore(btn) {
   menu.style.top = `${r.bottom + h + 6 > innerHeight ? r.top - h - 4 : r.bottom + 4}px`;
 }
 document.addEventListener('click', (e) => { if (!e.target.closest('.more, .more-menu')) closeMoreMenus(); });
+// Klick auf einen Punkt im offenen Menue: das haengt am <body>, die Auswertung sitzt aber in #content.
+// Menue zurueck in die Kachel und den Klick dort noch einmal ausloesen.
+document.addEventListener('click', (e) => {
+  const item = e.target.closest('.more-menu .more-item');
+  if (!item || $('#content').contains(item)) return;
+  if (!item.closest('.more-menu').moreBtn?.isConnected) { closeMoreMenus(); return; }
+  closeMoreMenus();
+  // neues Ereignis statt item.click(): ein Klick auf dasselbe Element waehrend seines eigenen Klicks
+  // ignoriert der Browser
+  if (!item.disabled) item.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+});
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMoreMenus(); });
 window.addEventListener('resize', closeMoreMenus);
 document.addEventListener('scroll', closeMoreMenus, true);

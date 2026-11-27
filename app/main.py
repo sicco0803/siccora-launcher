@@ -30,7 +30,7 @@ from backend.vault import asset_updates, epic_cached, epic_vault_dirs
 
 # im fertigen Paket liegen ui/ usw. im Entpack-Ordner von PyInstaller
 HERE = getattr(sys, "_MEIPASS", None) or os.path.dirname(os.path.abspath(__file__))
-APP_VERSION = "1.0.11"
+APP_VERSION = "1.0.12"
 
 # Sprache fest in der Adresse: Fab ignoriert die Browsersprache und entscheidet sonst
 # selbst (bei Mike kam so eine fremde Sprache heraus); Fab: ?lang=de, Epic: /de/ bzw. /en-US/
@@ -175,7 +175,19 @@ class Api:
             if parsed.scheme != "https" or parsed.hostname != "www.epicgames.com" \
                     or not parsed.path.startswith("/id/api/redirect"):
                 return
-            result = self._epic.login_with_text(win.evaluate_js("document.body.innerText") or "")
+            # Adresse und Text in EINEM Skriptaufruf lesen und die Herkunft genau dieser Daten noch
+            # einmal pruefen - zwischen Laden-Ereignis und Auslesen koennte sonst eine andere Seite nachladen
+            try:
+                snap = win.evaluate_js("JSON.stringify({u: location.href, t: document.body.innerText})") or "{}"
+                snap = json.loads(snap) if isinstance(snap, str) else snap  # pywebview liefert teils schon ein Objekt
+                if not isinstance(snap, dict):
+                    raise ValueError
+            except (TypeError, ValueError):
+                return
+            src = urllib.parse.urlparse(snap.get("u") or "")
+            if src.scheme != "https" or src.hostname != "www.epicgames.com" or not src.path.startswith("/id/api/redirect"):
+                return
+            result = self._epic.login_with_text(snap.get("t") or "")
             self._login_window = None
             win.destroy()
             self._window.evaluate_js(f"onEpicLogin({json.dumps(result)})")
